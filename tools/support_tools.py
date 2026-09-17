@@ -121,14 +121,17 @@ def draft_response(state: dict, use_groq: bool = False) -> str:
             from groq import Groq
 
             context = source["text"] if source else "No matching FAQ was found."
+            history = state.get("history") or []
+            messages = [
+                {"role": "system", "content": "You are a concise, friendly customer-support agent. Ground every factual claim in the supplied knowledge-base context. Do not invent policies, procedures, or account information. If the context does not answer the request, say that a support teammate will review it."},
+                *history,
+                {"role": "user", "content": f"Customer: {name}\nMessage: {state['message']}\nFAQ context: {context}"},
+            ]
             completion = Groq().chat.completions.create(
                 model="llama-3.1-8b-instant",
                 temperature=0.2,
                 max_tokens=180,
-                messages=[
-                    {"role": "system", "content": "You are a concise, friendly customer-support agent. Ground every factual claim in the supplied knowledge-base context. Do not invent policies, procedures, or account information. If the context does not answer the request, say that a support teammate will review it."},
-                    {"role": "user", "content": f"Customer: {name}\nMessage: {state['message']}\nFAQ context: {context}"},
-                ],
+                messages=messages,
             )
             content = completion.choices[0].message.content
             if content:
@@ -140,22 +143,38 @@ def draft_response(state: dict, use_groq: bool = False) -> str:
     return f"Hi {name}, thanks for reaching out. I couldn’t find a precise answer, so I’ve logged your message for the support team to review."
 
 
+def _redact_pii(text: str) -> str:
+    """Strip PII from text before writing to the audit log."""
+    try:
+        from presidio_analyzer import AnalyzerEngine
+        from presidio_anonymizer import AnonymizerEngine
+
+        analyzer = AnalyzerEngine()
+        anonymizer = AnonymizerEngine()
+        results = analyzer.analyze(text=text, language="en")
+        return anonymizer.anonymize(text=text, analyzer_results=results).text
+    except Exception:
+        # Fall back to a simple email/phone scrub if presidio is unavailable.
+        cleaned = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "[EMAIL]", text)
+        cleaned = re.sub(r"\b\d[\d\s\-().]{6,}\d\b", "[PHONE]", cleaned)
+        return cleaned
+
+
 def log_interaction(state: dict) -> bool:
     try:
-        # Obsidian reads ordinary Markdown files. Point this at an existing vault
-        # through OBSIDIAN_VAULT, or use the project-local vault by default.
         vault = Path(os.getenv("OBSIDIAN_VAULT", "obsidian-vault"))
         log_dir = vault / "Aria Support" / "Interactions"
         log_dir.mkdir(parents=True, exist_ok=True)
         now = datetime.now(UTC)
-        # A UUID prevents two messages in the same second from overwriting a note.
         note = log_dir / f"{now:%Y-%m-%d_%H%M%S}_{state['conversation_id'][:8]}_{uuid4().hex[:6]}.md"
         ticket = state.get("ticket") or {}
+        safe_message = _redact_pii(state["message"])
+        safe_response = _redact_pii(state["response"])
         note.write_text(
             f"---\ncreated: {now.isoformat()}\nconversation_id: {state['conversation_id']}\n"
             f"customer_id: {state.get('customer_id') or 'unknown'}\nescalated: {str(state['escalated']).lower()}\n"
             f"ticket_id: {ticket.get('id', '')}\n---\n\n# Customer interaction\n\n"
-            f"## Message\n\n{state['message']}\n\n## Aria response\n\n{state['response']}\n"
+            f"## Message\n\n{safe_message}\n\n## Aria response\n\n{safe_response}\n"
             f"\n## FAQ sources\n\n" + "\n".join(f"- {item['title']}" for item in state.get("faq_sources", [])),
             encoding="utf-8",
         )

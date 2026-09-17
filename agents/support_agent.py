@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from collections import defaultdict
 from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -16,11 +17,16 @@ from tools.support_tools import (
     propose_knowledge_note,
 )
 
+# In-memory conversation history: {conversation_id: [{"role": ..., "content": ...}]}
+_history: dict[str, list[dict]] = defaultdict(list)
+MAX_HISTORY_TURNS = 6
+
 
 class SupportState(TypedDict, total=False):
     message: str
     customer_id: str | None
     conversation_id: str
+    history: list[dict]
     customer: dict | None
     account_status: dict | None
     faq_sources: list[dict]
@@ -82,4 +88,13 @@ class SupportAgent:
     def handle(self, message: str, customer_id: str | None, conversation_id: str) -> dict[str, Any]:
         if not message.strip():
             raise ValueError("message cannot be empty")
-        return dict(self.graph.invoke({"message": message.strip(), "customer_id": customer_id, "conversation_id": conversation_id}))
+        history = _history[conversation_id][-MAX_HISTORY_TURNS:]
+        result = dict(self.graph.invoke({
+            "message": message.strip(),
+            "customer_id": customer_id,
+            "conversation_id": conversation_id,
+            "history": history,
+        }))
+        _history[conversation_id].append({"role": "user", "content": message.strip()})
+        _history[conversation_id].append({"role": "assistant", "content": result.get("response", "")})
+        return result
