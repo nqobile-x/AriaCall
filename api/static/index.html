@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Aria — Support, in a conversation</title>
+    <link rel="icon" href="/static/aria-mark.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header>
+        <div class="brand"><img src="/static/aria-mark.svg" alt="" /><span>ARIA</span><small>01</small></div>
+        <div id="status" class="status"><i></i>System available</div>
+      </header>
+
+      <section id="conversation" class="conversation" aria-live="polite">
+        <div class="welcome">
+          <div class="signal" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+          <p class="eyebrow">CUSTOMER CARE / SIGNAL 01</p>
+          <h1>A different kind<br />of help desk.</h1>
+          <p>Speak naturally. Aria listens, searches your knowledge base, and keeps the useful parts on record.</p>
+          <div class="suggestions">
+            <button data-prompt="How do I reset my password?">Reset my password</button>
+            <button data-prompt="How do I update my billing details?">Update billing</button>
+            <button data-prompt="I was charged twice">I was charged twice</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="composer" aria-label="Message Aria">
+        <label class="sr-only" for="message">Message Aria</label>
+        <textarea id="message" rows="1" placeholder="Message Aria…" maxlength="5000"></textarea>
+        <button id="send" class="send" type="button" aria-label="Send message">↑</button>
+        <button id="mic" class="mic" type="button" aria-label="Speak to Aria"><span></span></button>
+        <p class="voice-note" id="voice-note">VOICE MODE · LOCAL KOKORO</p>
+      </section>
+    </main>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

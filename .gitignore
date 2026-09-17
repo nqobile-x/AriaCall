@@ -1,0 +1,29 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pip-tmp/
+
+# Environment
+.env
+
+# Voice model binaries (large files)
+voice/models/
+voice/.whisper-cache/
+voice/.runtime-tmp/
+
+# Test artefacts
+tests/.test-vaults/
+
+# Obsidian local vault copy
+obsidian-vault/
+
+# Runtime-generated logs and audio
+Aria Support/
+voice/*.wav
+voice/*.mp3
+
+# Editor
+.vscode/
+.idea/
