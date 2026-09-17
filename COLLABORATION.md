@@ -76,11 +76,15 @@ OBSIDIAN_VAULT=C:\Users\nqobile\Desktop\OBSIDIAN\Nqobz\AriaCall
 - [x] Escalation — keyword detection (fraud, charged twice, legal, etc.)
 - [x] Ticket creation with ARIA-XXXXXXXX IDs
 - [x] PII redaction (Presidio) before audit log write
-- [x] Conversation memory — 6 turns per session_id
-- [x] Voice TTS — Kokoro ONNX local
+- [x] Conversation memory — 6 turns per session_id, keyed by conversation_id
+- [x] Voice TTS — Kokoro ONNX local (198KB WAV verified)
 - [x] Voice STT — Faster-Whisper local
 - [x] Knowledge base learning queue
-- [x] 4/4 end-to-end tests passing
+- [x] Persistent conversation_id via localStorage — audit records group correctly
+- [x] "New Chat" button — fresh UUID, clears UI and ticket banner
+- [x] "Talk to a human" visible button — triggers escalation workflow
+- [x] Ticket banner — shows ARIA-XXXXXXXX on escalation in the UI
+- [x] 4/4 end-to-end tests passing (verified on combined codebase)
 
 ---
 
@@ -93,6 +97,17 @@ OBSIDIAN_VAULT=C:\Users\nqobile\Desktop\OBSIDIAN\Nqobz\AriaCall
 | 2026-09-17 | Conversation memory (6 turns, in-memory) |
 | 2026-09-17 | Fixed FAQ scoring — title hits weighted 3x, normalised by length |
 | 2026-09-17 | Comprehensive README, render.yaml, .env.example |
+
+## Recent changes (ChatGPT)
+
+| Date | Change |
+|---|---|
+| 2026-09-17 | Persistent `conversation_id` in localStorage — groups audit logs across refreshes |
+| 2026-09-17 | "New Chat" button — resets UUID, clears conversation + ticket banner |
+| 2026-09-17 | "Talk to a human" button — visible escalation trigger in suggestions |
+| 2026-09-17 | Ticket banner — shows ticket ID on escalation in fixed position UI |
+| 2026-09-17 | Voice UX: silence detection, one tap to record |
+| 2026-09-17 | Verified combined suite: 4/4 tests passing |
 
 ---
 

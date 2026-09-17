@@ -4,6 +4,10 @@ const send = document.querySelector('#send');
 const mic = document.querySelector('#mic');
 const status = document.querySelector('#status');
 const voiceNote = document.querySelector('#voice-note');
+const ticketBanner = document.querySelector('#ticket-banner');
+const conversationIdKey = 'aria-conversation-id';
+let conversationId = localStorage.getItem(conversationIdKey) || crypto.randomUUID();
+localStorage.setItem(conversationIdKey, conversationId);
 
 function setBusy(busy, text = busy ? 'Thinking…' : 'Ready to help') {
   status.classList.toggle('busy', busy); status.lastChild.textContent = text; send.disabled = busy;
@@ -21,10 +25,11 @@ async function submit(message = textarea.value.trim()) {
   if (!message || send.disabled) return;
   textarea.value = ''; textarea.style.height = 'auto'; addMessage('user', message); setBusy(true);
   try {
-    const response = await fetch('/support', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message}) });
+    const response = await fetch('/support', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message, conversation_id: conversationId}) });
     const data = await response.json(); if (!response.ok) throw new Error(data.detail || 'Unable to reach Aria');
     const spokenReply = data.response.replace(/_Source:.*?_/s, '').trim();
     addMessage('aria', spokenReply, data.faq_sources);
+    if (data.escalated && data.ticket) { ticketBanner.hidden = false; ticketBanner.innerHTML = `<strong>HUMAN SUPPORT REQUESTED</strong><br>Ticket ${data.ticket.id} is open.`; }
     const sound = await fetch('/voice', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text: spokenReply})});
     if (sound.ok) { const audio = new Audio(URL.createObjectURL(await sound.blob())); audio.play(); }
     setBusy(false, data.escalated ? 'Support ticket created' : 'Ready to help');
@@ -34,6 +39,8 @@ textarea.addEventListener('input', () => { textarea.style.height = 'auto'; texta
 textarea.addEventListener('keydown', event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); submit(); } });
 send.addEventListener('click', () => submit());
 document.querySelectorAll('[data-prompt]').forEach(button => button.addEventListener('click', () => submit(button.dataset.prompt)));
+document.querySelector('#human-help').addEventListener('click', () => submit('I need a human agent to help me.'));
+document.querySelector('#new-chat').addEventListener('click', () => { conversationId = crypto.randomUUID(); localStorage.setItem(conversationIdKey, conversationId); conversation.innerHTML = ''; ticketBanner.hidden = true; textarea.focus(); setBusy(false, 'New conversation'); });
 let recorder, stream, chunks = [], audioContext, analyser, silenceTimer, listeningStarted;
 function monitorSilence() {
   const samples = new Uint8Array(analyser.fftSize);
