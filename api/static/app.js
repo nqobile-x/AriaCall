@@ -26,7 +26,9 @@ async function submit(message = textarea.value.trim()) {
   textarea.value = ''; textarea.style.height = 'auto'; addMessage('user', message); setBusy(true);
   try {
     const response = await fetch('/support', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message, conversation_id: conversationId}) });
-    const data = await response.json(); if (!response.ok) throw new Error(data.detail || 'Unable to reach Aria');
+    let data;
+    try { data = await response.json(); } catch (_) { throw new Error('Aria is waking up — give it 10 seconds and try again.'); }
+    if (!response.ok) throw new Error(data.detail || 'Unable to reach Aria');
     const spokenReply = data.response.replace(/_Source:.*?_/s, '').trim();
     addMessage('aria', spokenReply, data.faq_sources);
     if (data.escalated && data.ticket) { ticketBanner.hidden = false; ticketBanner.innerHTML = `<strong>HUMAN SUPPORT REQUESTED</strong><br>Ticket ${data.ticket.id} is open.`; }
