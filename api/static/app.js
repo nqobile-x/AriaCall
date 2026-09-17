@@ -8,6 +8,8 @@ const ticketBanner = document.querySelector('#ticket-banner');
 const conversationIdKey = 'aria-conversation-id';
 let conversationId = localStorage.getItem(conversationIdKey) || crypto.randomUUID();
 localStorage.setItem(conversationIdKey, conversationId);
+// Ping the server every 10 minutes so Render free tier doesn't spin down mid-session.
+setInterval(() => fetch('/health').catch(() => {}), 10 * 60 * 1000);
 
 function setBusy(busy, text = busy ? 'Thinking…' : 'Ready to help') {
   status.classList.toggle('busy', busy); status.lastChild.textContent = text; send.disabled = busy;
@@ -21,14 +23,27 @@ function addMessage(kind, text, sources = []) {
   if (sources.length) { const source = document.createElement('p'); source.className = 'sources'; source.textContent = `Grounded in: ${sources.map(s => s.title).join(', ')}`; item.append(source); }
   conversation.append(item); conversation.scrollTop = conversation.scrollHeight;
 }
+async function callSupport(message, retries = 3) {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    if (attempt > 0) {
+      setBusy(true, `Aria waking up… retrying (${attempt}/${retries - 1})`);
+      await new Promise(r => setTimeout(r, 12000));
+    }
+    const response = await fetch('/support', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message, conversation_id: conversationId}) });
+    let data;
+    try { data = await response.json(); } catch (_) {
+      if (attempt < retries - 1) continue; // cold-start 502 — retry
+      throw new Error('Aria is still waking up — please try again in a moment.');
+    }
+    if (!response.ok) throw new Error(data.detail || 'Unable to reach Aria');
+    return data;
+  }
+}
 async function submit(message = textarea.value.trim()) {
   if (!message || send.disabled) return;
   textarea.value = ''; textarea.style.height = 'auto'; addMessage('user', message); setBusy(true);
   try {
-    const response = await fetch('/support', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message, conversation_id: conversationId}) });
-    let data;
-    try { data = await response.json(); } catch (_) { throw new Error('Aria is waking up — give it 10 seconds and try again.'); }
-    if (!response.ok) throw new Error(data.detail || 'Unable to reach Aria');
+    const data = await callSupport(message);
     const spokenReply = data.response.replace(/_Source:.*?_/s, '').trim();
     addMessage('aria', spokenReply, data.faq_sources);
     if (data.escalated && data.ticket) { ticketBanner.hidden = false; ticketBanner.innerHTML = `<strong>HUMAN SUPPORT REQUESTED</strong><br>Ticket ${data.ticket.id} is open.`; }
