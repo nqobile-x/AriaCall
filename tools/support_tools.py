@@ -35,16 +35,28 @@ def account_status_checker(customer: dict | None) -> dict | None:
 
 
 def faq_search(message: str) -> list[dict]:
-    """Retrieve from the Obsidian knowledge base, falling back to starter FAQs."""
+    """Retrieve from the Obsidian knowledge base, falling back to starter FAQs.
+
+    Scoring: title word-hits are worth 3x body hits, normalised by document
+    length so a long catch-all document cannot win on volume alone.
+    """
     tokens = set(re.findall(r"[a-z]{3,}", message.lower()))
-    # Keep core agent guidance searchable even when the user's vault contains notes.
+    if not tokens:
+        return []
     documents = _knowledge_base_documents() + FAQS
-    ranked = sorted(
-        documents,
-        key=lambda item: len(tokens & set(re.findall(r"[a-z]{3,}", f"{item['title']} {item['text']}".lower()))),
-        reverse=True,
-    )
-    return [item for item in ranked[:3] if tokens & set(re.findall(r"[a-z]{3,}", f"{item['title']} {item['text']}".lower()))]
+
+    def score(item: dict) -> float:
+        title_tokens = set(re.findall(r"[a-z]{3,}", item["title"].lower()))
+        body_tokens = re.findall(r"[a-z]{3,}", item["text"].lower())
+        body_unique = set(body_tokens)
+        title_hits = len(tokens & title_tokens)
+        body_hits = len(tokens & body_unique)
+        # Normalise body hits by vocab size to penalise very long catch-all docs.
+        body_score = body_hits / max(len(body_unique), 1) * 10
+        return title_hits * 3 + body_score
+
+    ranked = sorted(documents, key=score, reverse=True)
+    return [item for item in ranked[:3] if score(item) > 0]
 
 
 def _knowledge_base_documents() -> list[dict]:
