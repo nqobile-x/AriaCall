@@ -5,7 +5,8 @@ services:
     buildCommand: |
       pip install uv &&
       uv pip install --system -r requirements.txt &&
-      python -m spacy download en_core_web_lg
+      python -m spacy download en_core_web_lg &&
+      python scripts/download_models.py
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: GROQ_API_KEY

@@ -58,8 +58,8 @@ function monitorSilence() {
     let energy = 0; for (const sample of samples) energy += Math.abs(sample - 128);
     const speaking = energy / samples.length > 2.5;
     if (speaking) { silenceTimer = performance.now(); }
-    // Give the user a short opening window, then finish after 1.15 s of silence.
-    if (performance.now() - listeningStarted > 900 && performance.now() - silenceTimer > 1150) { recorder.stop(); return; }
+    // Give the user an opening window, then finish after 1.8 s of silence.
+    if (performance.now() - listeningStarted > 1500 && performance.now() - silenceTimer > 1800) { recorder.stop(); return; }
     requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);
@@ -80,7 +80,7 @@ mic.addEventListener('click', async () => {
     recorder.onstop = async () => {
       mic.classList.remove('listening'); audioContext?.close(); voiceNote.textContent = 'TRANSCRIBING LOCALLY…'; stream.getTracks().forEach(track => track.stop());
       try { const form = new FormData(); form.append('audio', new Blob(chunks, {type:recorder.mimeType}), 'aria-recording.webm'); const r = await fetch('/transcribe',{method:'POST',body:form}); const d = await r.json(); if (!r.ok || !d.text) throw new Error(); voiceNote.textContent = 'VOICE MODE · LOCAL KOKORO'; submit(d.text); }
-      catch (_) { voiceNote.textContent = 'LOCAL TRANSCRIPTION COULD NOT HEAR THAT'; }
+      catch (err) { voiceNote.textContent = err?.message?.startsWith('No speech') ? 'NO SPEECH DETECTED — TRY AGAIN' : 'MIC ERROR — SPEAK CLEARLY & RETRY'; }
     }; recorder.start();
   } catch (error) { voiceNote.textContent = error.name === 'NotAllowedError' ? 'ALLOW MICROPHONE ACCESS, THEN TRY AGAIN' : 'MICROPHONE IS UNAVAILABLE — TRY AGAIN'; }
 });
