@@ -31,7 +31,15 @@ async function submit(message = textarea.value.trim()) {
     addMessage('aria', spokenReply, data.faq_sources);
     if (data.escalated && data.ticket) { ticketBanner.hidden = false; ticketBanner.innerHTML = `<strong>HUMAN SUPPORT REQUESTED</strong><br>Ticket ${data.ticket.id} is open.`; }
     const sound = await fetch('/voice', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text: spokenReply})});
-    if (sound.ok) { const audio = new Audio(URL.createObjectURL(await sound.blob())); audio.play(); }
+    if (sound.ok) {
+      const audio = new Audio(URL.createObjectURL(await sound.blob())); audio.play();
+    } else {
+      // Kokoro model unavailable (e.g. Render free tier) — fall back to browser TTS
+      const utt = new SpeechSynthesisUtterance(spokenReply);
+      utt.rate = 1.0; utt.pitch = 1.05; utt.lang = 'en-US';
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utt);
+    }
     setBusy(false, data.escalated ? 'Support ticket created' : 'Ready to help');
   } catch (error) { addMessage('aria', `I’m having trouble connecting right now. ${error.message}`); setBusy(false, 'Connection issue'); }
 }
