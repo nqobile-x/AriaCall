@@ -104,10 +104,18 @@ async def transcribe(audio: UploadFile = File(...)) -> TranscriptionResponse:
     temp_dir.mkdir(parents=True, exist_ok=True)
     recording = temp_dir / f"recording-{uuid4().hex}.webm"
     try:
-        recording.write_bytes(await audio.read())
-        segments, _ = whisper_engine().transcribe(str(recording), beam_size=3, vad_filter=True)
+        data = await audio.read()
+        if len(data) < 1000:
+            raise HTTPException(status_code=400, detail="Recording too short — hold the mic button and speak clearly.")
+        recording.write_bytes(data)
+        # vad_filter=False so Whisper attempts transcription even on quiet recordings
+        segments, _ = whisper_engine().transcribe(str(recording), beam_size=5, vad_filter=False, language="en")
         text = " ".join(segment.text.strip() for segment in segments).strip()
+        if not text:
+            raise HTTPException(status_code=400, detail="No speech detected — try speaking closer to the mic.")
         return TranscriptionResponse(text=text)
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail="Local transcription failed.") from exc
     finally:
