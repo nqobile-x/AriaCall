@@ -79,20 +79,39 @@ def whisper_engine():
     return WhisperModel("base.en", device="cpu", compute_type="int8", download_root=str(cache_dir), local_files_only=True)
 
 
-@app.post("/voice", responses={200: {"content": {"audio/wav": {}}}})
+@app.post("/voice", responses={200: {"content": {"audio/mpeg": {}, "audio/wav": {}}}})
 def voice(request: VoiceRequest) -> Response:
+    # 1. ElevenLabs — natural neural voice (preferred when key is set)
+    eleven_key = os.getenv("ELEVENLABS_API_KEY")
+    if eleven_key:
+        try:
+            import httpx
+            resp = httpx.post(
+                "https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL",  # Sarah voice
+                headers={"xi-api-key": eleven_key, "Content-Type": "application/json"},
+                json={"text": request.text, "model_id": "eleven_turbo_v2", "voice_settings": {"stability": 0.4, "similarity_boost": 0.8}},
+                timeout=15,
+            )
+            if resp.status_code == 200:
+                return Response(content=resp.content, media_type="audio/mpeg")
+        except Exception:
+            pass  # fall through to Kokoro
+
+    # 2. Kokoro ONNX — local neural voice (dev, needs model files)
     model = Path("voice/models/kokoro-v1.0.onnx")
     voices = Path("voice/models/voices-v1.0.bin")
-    if not model.exists() or model.stat().st_size < 100_000_000 or not voices.exists():
-        raise HTTPException(status_code=503, detail="Kokoro's local model is still downloading.")
-    try:
-        import soundfile as sf
-        audio, sample_rate = kokoro_engine().create(request.text, voice="af_heart", speed=1.03, lang="en-us")
-        buffer = BytesIO()
-        sf.write(buffer, audio, sample_rate, format="WAV")
-        return Response(content=buffer.getvalue(), media_type="audio/wav")
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail="Kokoro could not create speech.") from exc
+    if model.exists() and model.stat().st_size >= 100_000_000 and voices.exists():
+        try:
+            import soundfile as sf
+            audio, sample_rate = kokoro_engine().create(request.text, voice="af_heart", speed=1.03, lang="en-us")
+            buffer = BytesIO()
+            sf.write(buffer, audio, sample_rate, format="WAV")
+            return Response(content=buffer.getvalue(), media_type="audio/wav")
+        except Exception:
+            pass
+
+    # 3. No TTS available — browser falls back to speechSynthesis
+    raise HTTPException(status_code=503, detail="No TTS engine available.")
 
 
 @app.post("/transcribe", response_model=TranscriptionResponse)
