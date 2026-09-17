@@ -90,10 +90,19 @@ def _knowledge_base_documents() -> list[dict]:
 
 
 def escalation_trigger(message: str, account_status: dict | None) -> dict:
-    urgent_terms = ("fraud", "charged twice", "chargeback", "legal", "lawsuit", "security breach", "human agent")
-    match = next((term for term in urgent_terms if term in message.lower()), None)
+    urgent_terms = (
+        "fraud", "charged twice", "chargeback", "legal", "lawsuit",
+        "security breach", "human agent", "refund", "data breach",
+        "account hacked", "unauthorized", "not working for weeks",
+        "escalate", "speak to manager", "this is unacceptable",
+    )
+    msg_lower = message.lower()
+    match = next((term for term in urgent_terms if term in msg_lower), None)
     if match:
-        return {"required": True, "reason": f"Escalation phrase detected: {match}"}
+        return {"required": True, "reason": f"Escalation phrase detected: '{match}'"}
+    # Detect frustrated/angry tone via exclamation clusters or strong negative language
+    if msg_lower.count("!") >= 3 or any(w in msg_lower for w in ("furious", "disgusted", "terrible service", "worst")):
+        return {"required": True, "reason": "High frustration detected in message tone"}
     if account_status and not account_status["billing_current"]:
         return {"required": True, "reason": "Account has an unresolved billing issue"}
     return {"required": False, "reason": None}
@@ -125,34 +134,75 @@ def propose_knowledge_note(state: dict) -> dict | None:
 
 def draft_response(state: dict, use_groq: bool = False) -> str:
     name = (state.get("customer") or {}).get("name", "there")
+    account = state.get("account_status")
+    faq_sources = state.get("faq_sources") or []
+
     if state.get("escalated"):
-        return f"Hi {name}, I’ve created ticket {state['ticket']['id']} and flagged it for our support team. They’ll review it as soon as possible."
-    source = (state.get("faq_sources") or [None])[0]
+        ticket_id = (state.get("ticket") or {}).get("id", "N/A")
+        return (
+            f"Hi {name}, I completely understand — this needs immediate attention. "
+            f"I’ve opened ticket **{ticket_id}** and flagged it as urgent. "
+            f"A member of our team will reach out to you shortly."
+        )
+
     if use_groq:
         try:
             from groq import Groq
 
-            context = source["text"] if source else "No matching FAQ was found."
+            # Build rich context from all matched FAQs
+            if faq_sources:
+                context_parts = [f"[{i+1}] {s[‘title’]}: {s[‘text’]}" for i, s in enumerate(faq_sources)]
+                context = "\n".join(context_parts)
+            else:
+                context = "No specific FAQ matched. Use your general knowledge to help, but do not invent account-specific data."
+
+            account_info = ""
+            if account:
+                account_info = f"\nCustomer plan: {account[‘plan’]} | Status: {account[‘status’]}"
+
+            system_prompt = (
+                "You are Aria, a warm, sharp, and efficient customer support agent. "
+                "You speak naturally — like a knowledgeable person, not a script. "
+                "Keep replies concise (2-4 sentences). "
+                "Ground every factual claim in the knowledge-base context below. "
+                "Never invent policies, prices, or account-specific data. "
+                "If you genuinely don’t know, say a specialist will follow up — don’t guess."
+            )
+
             history = state.get("history") or []
             messages = [
-                {"role": "system", "content": "You are a concise, friendly customer-support agent. Ground every factual claim in the supplied knowledge-base context. Do not invent policies, procedures, or account information. If the context does not answer the request, say that a support teammate will review it."},
+                {"role": "system", "content": system_prompt},
                 *history,
-                {"role": "user", "content": f"Customer: {name}\nMessage: {state['message']}\nFAQ context: {context}"},
+                {
+                    "role": "user",
+                    "content": (
+                        f"Customer name: {name}{account_info}\n"
+                        f"Their message: {state[‘message’]}\n\n"
+                        f"Knowledge base context:\n{context}"
+                    ),
+                },
             ]
             completion = Groq().chat.completions.create(
-                model="llama-3.1-8b-instant",
-                temperature=0.2,
-                max_tokens=180,
+                model="llama-3.3-70b-versatile",
+                temperature=0.3,
+                max_tokens=220,
                 messages=messages,
             )
             content = completion.choices[0].message.content
             if content:
-                return content
+                return content.strip()
         except Exception:
             pass
-    if source:
-        return f"Hi {name}, {source['text']}\n\n_Source: {source['title']}_"
-    return f"Hi {name}, thanks for reaching out. I couldn’t find a precise answer, so I’ve logged your message for the support team to review."
+
+    # Fallback: use best FAQ directly
+    if faq_sources:
+        source = faq_sources[0]
+        return f"Hi {name}, {source[‘text’]}\n\n_Source: {source[‘title’]}_"
+    return (
+        f"Hi {name}, thanks for getting in touch! "
+        "I wasn’t able to find an exact match for that in our knowledge base, "
+        "but I’ve logged your message and our team will follow up with you soon."
+    )
 
 
 def _redact_pii(text: str) -> str:
