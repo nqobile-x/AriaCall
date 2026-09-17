@@ -141,7 +141,7 @@ def draft_response(state: dict, use_groq: bool = False) -> str:
         ticket_id = (state.get("ticket") or {}).get("id", "N/A")
         return (
             f"Hi {name}, I completely understand — this needs immediate attention. "
-            f"I’ve opened ticket **{ticket_id}** and flagged it as urgent. "
+            f"I've opened ticket **{ticket_id}** and flagged it as urgent. "
             f"A member of our team will reach out to you shortly."
         )
 
@@ -151,14 +151,14 @@ def draft_response(state: dict, use_groq: bool = False) -> str:
 
             # Build rich context from all matched FAQs
             if faq_sources:
-                context_parts = [f"[{i+1}] {s[‘title’]}: {s[‘text’]}" for i, s in enumerate(faq_sources)]
+                context_parts = [f"[{i+1}] {s['title']}: {s['text']}" for i, s in enumerate(faq_sources)]
                 context = "\n".join(context_parts)
             else:
                 context = "No specific FAQ matched. Use your general knowledge to help, but do not invent account-specific data."
 
             account_info = ""
             if account:
-                account_info = f"\nCustomer plan: {account[‘plan’]} | Status: {account[‘status’]}"
+                account_info = f"\nCustomer plan: {account['plan']} | Status: {account['status']}"
 
             system_prompt = (
                 "You are Aria, a warm, sharp, and efficient customer support agent. "
@@ -166,7 +166,7 @@ def draft_response(state: dict, use_groq: bool = False) -> str:
                 "Keep replies concise (2-4 sentences). "
                 "Ground every factual claim in the knowledge-base context below. "
                 "Never invent policies, prices, or account-specific data. "
-                "If you genuinely don’t know, say a specialist will follow up — don’t guess."
+                "If you genuinely don't know, say a specialist will follow up — don't guess."
             )
 
             history = state.get("history") or []
@@ -177,7 +177,7 @@ def draft_response(state: dict, use_groq: bool = False) -> str:
                     "role": "user",
                     "content": (
                         f"Customer name: {name}{account_info}\n"
-                        f"Their message: {state[‘message’]}\n\n"
+                        f"Their message: {state['message']}\n\n"
                         f"Knowledge base context:\n{context}"
                     ),
                 },
@@ -197,11 +197,11 @@ def draft_response(state: dict, use_groq: bool = False) -> str:
     # Fallback: use best FAQ directly
     if faq_sources:
         source = faq_sources[0]
-        return f"Hi {name}, {source[‘text’]}\n\n_Source: {source[‘title’]}_"
+        return f"Hi {name}, {source['text']}\n\n_Source: {source['title']}_"
     return (
         f"Hi {name}, thanks for getting in touch! "
-        "I wasn’t able to find an exact match for that in our knowledge base, "
-        "but I’ve logged your message and our team will follow up with you soon."
+        "I wasn't able to find an exact match for that in our knowledge base, "
+        "but I've logged your message and our team will follow up with you soon."
     )
 
 
