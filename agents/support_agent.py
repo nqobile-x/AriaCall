@@ -128,7 +128,23 @@ class SupportAgent:
         return {"learning_suggestion": propose_knowledge_note(state)}
 
     def log(self, state: SupportState) -> dict:
-        return {"audit_logged": log_interaction(state)}
+        logged = log_interaction(state)
+        # Extract topic categories from FAQ matches and write to Neo4j
+        faq_sources = state.get("faq_sources") or []
+        topics = list({s.get("category", s.get("title", "general")) for s in faq_sources if s})
+        if topics or state.get("escalated"):
+            try:
+                from tools.graph_memory import log_conversation
+                ticket = state.get("ticket") or {}
+                log_conversation(
+                    conversation_id=state.get("conversation_id", "unknown"),
+                    topics=topics or ["escalation"],
+                    escalated=bool(state.get("escalated")),
+                    ticket_id=ticket.get("id"),
+                )
+            except Exception:
+                pass
+        return {"audit_logged": logged}
 
     def handle(self, message: str, customer_id: str | None, conversation_id: str) -> dict[str, Any]:
         if not message.strip():

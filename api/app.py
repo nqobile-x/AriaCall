@@ -216,6 +216,16 @@ async def transcribe(audio: UploadFile = File(...)) -> TranscriptionResponse:
         recording.unlink(missing_ok=True)
 
 
+@app.get("/topics")
+def topics() -> list[dict]:
+    """Return the most-asked FAQ topics from Neo4j memory."""
+    try:
+        from tools.graph_memory import top_topics
+        return top_topics(limit=20)
+    except Exception:
+        return []
+
+
 @app.post("/support", response_model=SupportResponse)
 def support(request: SupportRequest) -> SupportResponse:
     try:
