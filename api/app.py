@@ -97,25 +97,37 @@ def whisper_engine():
     return WhisperModel("base.en", device="cpu", compute_type="int8", download_root=str(cache_dir), local_files_only=True)
 
 
-@app.post("/voice", responses={200: {"content": {"audio/wav": {}}}})
-def voice(request: VoiceRequest) -> Response:
+@app.post("/voice", responses={200: {"content": {"audio/mpeg": {}, "audio/wav": {}}}})
+async def voice(request: VoiceRequest) -> Response:
     # 1. Groq Orpheus — natural neural TTS, same API key as LLM
     groq_key = os.getenv("GROQ_API_KEY")
     if groq_key:
         try:
             from groq import Groq
-            tts_client = Groq(api_key=groq_key, timeout=30.0)
-            response = tts_client.audio.speech.create(
+            tts_response = Groq(api_key=groq_key, timeout=30.0).audio.speech.create(
                 model="canopylabs/orpheus-v1-english",
                 voice="tara",
                 response_format="wav",
                 input=request.text,
             )
-            return Response(content=response.content, media_type="audio/wav")
+            return Response(content=tts_response.content, media_type="audio/wav")
         except Exception:
-            pass  # fall through to Kokoro
+            pass
 
-    # 2. Kokoro ONNX — local neural voice (needs model files on disk)
+    # 2. Edge TTS — Microsoft AriaNeural (free, no key, natural sound)
+    try:
+        import edge_tts
+        communicate = edge_tts.Communicate(request.text, voice="en-US-AriaNeural", rate="+5%", pitch="+0Hz")
+        buffer = BytesIO()
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                buffer.write(chunk["data"])
+        if buffer.tell() > 0:
+            return Response(content=buffer.getvalue(), media_type="audio/mpeg")
+    except Exception:
+        pass
+
+    # 3. Kokoro ONNX — local neural voice (needs model files on disk)
     model_path = Path("voice/models/kokoro-v1.0.onnx")
     voices_path = Path("voice/models/voices-v1.0.bin")
     if model_path.exists() and model_path.stat().st_size >= 100_000_000 and voices_path.exists():
@@ -128,7 +140,7 @@ def voice(request: VoiceRequest) -> Response:
         except Exception:
             pass
 
-    # 3. No TTS available — browser falls back to speechSynthesis
+    # 4. No TTS available — browser falls back to speechSynthesis
     raise HTTPException(status_code=503, detail="No TTS engine available.")
 
 
