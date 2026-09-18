@@ -58,13 +58,10 @@ def debug_groq() -> dict:
     if not key:
         return {"error": "GROQ_API_KEY not set", "key_preview": None}
     try:
-        from groq import Groq
-        completion = Groq(api_key=key, timeout=10.0).chat.completions.create(
-            model="llama3-70b-8192",
-            messages=[{"role": "user", "content": "Say hi"}],
-            max_tokens=10,
-        )
-        return {"status": "ok", "response": completion.choices[0].message.content, "key_preview": key[:8] + "..."}
+        import httpx
+        resp = httpx.get("https://api.groq.com/openai/v1/models", headers={"Authorization": f"Bearer {key}"}, timeout=10)
+        models = [m["id"] for m in resp.json().get("data", [])]
+        return {"available_models": models, "key_preview": key[:8] + "..."}
     except Exception as exc:
         return {"error": type(exc).__name__, "detail": str(exc), "key_preview": key[:8] + "..."}
 
