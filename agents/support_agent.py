@@ -88,6 +88,15 @@ class SupportAgent:
         return {"account_status": account_status_checker(customer)}
 
     def search_faq(self, state: SupportState) -> dict:
+        # Try RAG (Pinecone semantic search) first
+        try:
+            from tools.rag import rag_search
+            rag_results = rag_search(state["message"], company_id="default")
+            if rag_results:
+                return {"faq_sources": rag_results}
+        except Exception:
+            pass
+        # Fall back to keyword KB
         return {"faq_sources": faq_search(state["message"])}
 
     def escalate_if_needed(self, state: SupportState) -> dict:
