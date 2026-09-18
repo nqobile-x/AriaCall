@@ -7,13 +7,16 @@ from typing import Any, TypedDict
 
 
 def _extract_contact(message: str) -> dict:
-    """Pull name and email from a user message like 'Sam Mokoena, sam@x.com'."""
+    """Pull name and email from a user message in any format."""
     email_match = re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", message)
     email = email_match.group(0).lower() if email_match else None
     if email and email_match:
         before = message[: email_match.start()]
-        # Strip trailing label words like "email:", "e-mail :", "my email is", etc.
-        before = re.sub(r"[\s,;]*\b(e-?mail|address|is|:)\b[\s:]*$", "", before, flags=re.IGNORECASE).strip().rstrip(",.;:")
+        # Strip trailing labels: "email address :", "email :", "e-mail:", "my email is", ", email"
+        before = re.sub(r"[\s,;]*\b(my\s+)?(e-?mail(\s+address)?|address)(\s+is)?\b[\s:]*$", "", before, flags=re.IGNORECASE)
+        # Strip leading labels: "name :", "name:", "my name is"
+        before = re.sub(r"^[\s]*\b(my\s+)?name\s*[:\-is]*\s*", "", before, flags=re.IGNORECASE)
+        before = before.strip().strip(",.;:")
         name = before if 2 < len(before) < 60 else None
     else:
         name = None
