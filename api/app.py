@@ -10,7 +10,8 @@ from pathlib import Path
 from uuid import uuid4
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from api.auth import get_company_id, verify_api_key
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -219,7 +220,7 @@ async def transcribe(audio: UploadFile = File(...)) -> TranscriptionResponse:
 @app.post("/upload")
 async def upload_doc(
     file: UploadFile = File(...),
-    company_id: str = "default",
+    company_id: str = Depends(get_company_id),
 ) -> dict:
     """Ingest a PDF, DOCX or TXT file into Pinecone for RAG search."""
     allowed = {"pdf", "docx", "doc", "txt"}
@@ -253,12 +254,13 @@ def topics() -> list[dict]:
 
 
 @app.post("/support", response_model=SupportResponse)
-def support(request: SupportRequest) -> SupportResponse:
+def support(request: SupportRequest, company: dict = Depends(verify_api_key)) -> SupportResponse:
     try:
         result = agent.handle(
             message=request.message,
             customer_id=request.customer_id,
             conversation_id=request.conversation_id or str(uuid4()),
+            company_id=company["company_id"],
         )
         return SupportResponse(**result)
     except ValueError as exc:

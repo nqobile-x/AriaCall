@@ -51,7 +51,7 @@ async function callSupport(message, retries = 3) {
     }
     const response = await fetch('/support', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': 'aria-demo-key-2024' },
       body: JSON.stringify({ message, conversation_id: conversationId }),
     });
     let data;

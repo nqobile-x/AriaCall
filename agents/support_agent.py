@@ -44,6 +44,7 @@ class SupportState(TypedDict, total=False):
     message: str
     customer_id: str | None
     conversation_id: str
+    company_id: str
     history: list[dict]
     customer: dict | None
     account_status: dict | None
@@ -88,15 +89,14 @@ class SupportAgent:
         return {"account_status": account_status_checker(customer)}
 
     def search_faq(self, state: SupportState) -> dict:
-        # Try RAG (Pinecone semantic search) first
+        company_id = state.get("company_id", "default")
         try:
             from tools.rag import rag_search
-            rag_results = rag_search(state["message"], company_id="default")
+            rag_results = rag_search(state["message"], company_id=company_id)
             if rag_results:
                 return {"faq_sources": rag_results}
         except Exception:
             pass
-        # Fall back to keyword KB
         return {"faq_sources": faq_search(state["message"])}
 
     def escalate_if_needed(self, state: SupportState) -> dict:
@@ -162,7 +162,7 @@ class SupportAgent:
                 pass
         return {"audit_logged": logged}
 
-    def handle(self, message: str, customer_id: str | None, conversation_id: str) -> dict[str, Any]:
+    def handle(self, message: str, customer_id: str | None, conversation_id: str, company_id: str = "default") -> dict[str, Any]:
         if not message.strip():
             raise ValueError("message cannot be empty")
         history = _history[conversation_id][-MAX_HISTORY_TURNS * 2:]
@@ -170,6 +170,7 @@ class SupportAgent:
             "message": message.strip(),
             "customer_id": customer_id,
             "conversation_id": conversation_id,
+            "company_id": company_id,
             "history": history,
         }))
 
