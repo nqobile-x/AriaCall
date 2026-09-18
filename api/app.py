@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import logging
 import os
 from functools import lru_cache
+
+logger = logging.getLogger(__name__)
 from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
@@ -103,20 +106,23 @@ async def voice(request: VoiceRequest) -> Response:
     engine = request.engine
     groq_key = os.getenv("GROQ_API_KEY")
 
-    # Orpheus — Groq neural TTS (tara voice)
+    # Orpheus — Groq neural TTS via raw httpx (avoids SDK version issues)
     if engine in ("orpheus", "auto") and groq_key:
         try:
-            from groq import Groq
-            tts_response = Groq(api_key=groq_key, timeout=30.0).audio.speech.create(
-                model="canopylabs/orpheus-v1-english",
-                voice="tara",
-                response_format="wav",
-                input=request.text,
+            import httpx
+            resp = httpx.post(
+                "https://api.groq.com/openai/v1/audio/speech",
+                headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+                json={"model": "canopylabs/orpheus-v1-english", "voice": "tara", "response_format": "wav", "input": request.text},
+                timeout=30.0,
             )
-            return Response(content=tts_response.content, media_type="audio/wav")
-        except Exception:
-            if engine != "auto":
-                raise HTTPException(status_code=503, detail="Orpheus TTS unavailable.")
+            if resp.status_code == 200:
+                return Response(content=resp.content, media_type="audio/wav")
+            logger.error("Orpheus TTS error %s: %s", resp.status_code, resp.text[:300])
+        except Exception as exc:
+            logger.error("Orpheus TTS exception: %s", exc)
+        if engine != "auto":
+            raise HTTPException(status_code=503, detail="Orpheus TTS unavailable.")
 
     # Edge TTS — Microsoft AriaNeural (free, no key)
     if engine in ("edge", "auto"):
@@ -129,7 +135,8 @@ async def voice(request: VoiceRequest) -> Response:
                     buffer.write(chunk["data"])
             if buffer.tell() > 0:
                 return Response(content=buffer.getvalue(), media_type="audio/mpeg")
-        except Exception:
+        except Exception as exc:
+            logger.error("Edge TTS exception: %s", exc)
             if engine != "auto":
                 raise HTTPException(status_code=503, detail="Edge TTS unavailable.")
 
