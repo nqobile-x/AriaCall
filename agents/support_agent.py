@@ -10,9 +10,10 @@ def _extract_contact(message: str) -> dict:
     """Pull name and email from a user message like 'Sam Mokoena, sam@x.com'."""
     email_match = re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", message)
     email = email_match.group(0).lower() if email_match else None
-    # Name: everything before the email, strip punctuation
     if email and email_match:
-        before = message[: email_match.start()].strip().rstrip(",").strip()
+        before = message[: email_match.start()]
+        # Strip trailing label words like "email:", "e-mail :", "my email is", etc.
+        before = re.sub(r"[\s,;]*\b(e-?mail|address|is|:)\b[\s:]*$", "", before, flags=re.IGNORECASE).strip().rstrip(",.;:")
         name = before if 2 < len(before) < 60 else None
     else:
         name = None
