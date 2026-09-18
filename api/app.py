@@ -60,7 +60,7 @@ def debug_groq() -> dict:
     try:
         from groq import Groq
         completion = Groq(api_key=key, timeout=10.0).chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="llama3-70b-8192",
             messages=[{"role": "user", "content": "Say hi"}],
             max_tokens=10,
         )

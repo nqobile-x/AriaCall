@@ -186,7 +186,7 @@ def draft_response(state: dict, use_groq: bool = False) -> str:
                 },
             ]
             completion = Groq(timeout=20.0).chat.completions.create(
-                model="llama-3.3-70b-versatile",
+                model="llama3-70b-8192",
                 temperature=0.3,
                 max_tokens=220,
                 messages=messages,
