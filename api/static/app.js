@@ -140,12 +140,34 @@ function startCall() {
   callBtn.classList.add('in-call');
   callBtn.textContent = '🔴';
   callBtn.title = 'End call';
-  setBusy(false, 'CALL ACTIVE — listening…');
+  setBusy(false, 'CALL ACTIVE — Aria greeting…');
+
+  const GREETINGS = [
+    "Hi, thanks for calling PulseFlow support. I'm Aria. How can I help you today?",
+    "Hello! You've reached PulseFlow support. I'm Aria, your virtual assistant. What can I do for you?",
+    "Hi there! This is Aria from PulseFlow support. How can I assist you today?",
+  ];
+  const FILLERS = [
+    "Got it, one moment.",
+    "Sure, let me check that for you.",
+    "Absolutely, give me just a second.",
+    "On it, one moment please.",
+    "Of course, let me look into that.",
+  ];
 
   recognition = new SR();
   recognition.lang = 'en-US';
   recognition.continuous = false;
   recognition.interimResults = false;
+
+  // Speak greeting before starting to listen
+  callAudioPlaying = true;
+  const greeting = GREETINGS[Math.floor(Math.random() * GREETINGS.length)];
+  addMessage('aria', greeting);
+  speak(greeting).then(() => {
+    callAudioPlaying = false;
+    if (inCall) { setBusy(false, 'CALL ACTIVE — listening…'); recognition.start(); }
+  });
 
   recognition.onresult = async (e) => {
     const text = e.results[0][0].transcript.trim();
@@ -153,16 +175,22 @@ function startCall() {
     recognition.stop();
     callAudioPlaying = true;
     addMessage('user', text);
-    setBusy(true, 'Aria is thinking…');
+    setBusy(false, 'CALL ACTIVE — Aria speaking…');
+
+    // Speak filler immediately while fetching the real answer
+    const filler = FILLERS[Math.floor(Math.random() * FILLERS.length)];
+    const fillerDone = speak(filler);
+    const supportDone = callSupport(text);
+
     try {
-      const data = await callSupport(text);
+      await fillerDone;
+      const data = await supportDone;
       const reply = data.response.replace(/_Source:.*?_/s, '').trim();
       addMessage('aria', reply, data.faq_sources);
       if (data.escalated && data.ticket) {
         ticketBanner.hidden = false;
         ticketBanner.innerHTML = `<strong>HUMAN SUPPORT REQUESTED</strong><br>Ticket ${data.ticket.id} is open.`;
       }
-      setBusy(false, 'CALL ACTIVE — Aria speaking…');
       await speak(reply);
     } catch (err) {
       addMessage('aria', `Connection issue: ${err.message}`);
