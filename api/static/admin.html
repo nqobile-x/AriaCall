@@ -5,148 +5,399 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Aria Admin</title>
 <style>
-  :root {
-    --bg: #0a0b0e;
-    --surface: #13141a;
-    --border: #22232d;
-    --coral: #ff6d4a;
-    --green: #a7f3d0;
-    --text: #f0ede8;
-    --muted: #6b6b78;
-    --sidebar-w: 220px;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'Inter', 'Segoe UI', sans-serif; min-height: 100vh; }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
-  /* LOGIN */
+  :root {
+    --bg: #07080c;
+    --surface: #0f1018;
+    --surface2: #161820;
+    --border: #1e2030;
+    --border2: #252738;
+    --coral: #ff6d4a;
+    --coral-dim: rgba(255,109,74,.08);
+    --coral-glow: rgba(255,109,74,.15);
+    --green: #a7f3d0;
+    --green-dim: rgba(167,243,208,.08);
+    --blue: #7dd3fc;
+    --text: #eeeaf4;
+    --text2: #9898a8;
+    --text3: #4a4a5a;
+    --sidebar-w: 240px;
+    --radius: 10px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── LOGIN ── */
   #login-screen {
     display: flex; align-items: center; justify-content: center;
     min-height: 100vh; padding: 24px;
+    background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(255,109,74,.06) 0%, transparent 70%);
   }
-  .login-card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 12px; padding: 48px 40px; width: 100%; max-width: 400px;
-  }
-  .login-card .logo { font-size: 22px; font-weight: 700; letter-spacing: .12em; color: var(--coral); margin-bottom: 8px; }
-  .login-card .sub { font-size: 13px; color: var(--muted); margin-bottom: 32px; }
-  .login-card label { font-size: 11px; letter-spacing: .08em; color: var(--muted); display: block; margin-bottom: 6px; font-family: monospace; }
-  .login-card input {
-    width: 100%; background: var(--bg); border: 1px solid var(--border);
-    color: var(--text); padding: 12px 14px; border-radius: 6px;
-    font-size: 14px; outline: none; margin-bottom: 16px;
-  }
-  .login-card input:focus { border-color: var(--coral); }
-  .btn {
-    background: var(--coral); color: #fff; border: none; padding: 12px 24px;
-    border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
-    width: 100%; letter-spacing: .04em;
-  }
-  .btn:hover { opacity: .9; }
-  .btn:disabled { opacity: .5; cursor: not-allowed; }
-  .error-msg { color: #f87171; font-size: 12px; margin-top: 8px; }
 
-  /* LAYOUT */
+  .login-card {
+    width: 100%; max-width: 420px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 16px;
+    padding: 48px 40px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .login-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--coral), transparent);
+  }
+
+  .login-logo {
+    display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px;
+  }
+  .login-logo .wordmark {
+    font-size: 26px; font-weight: 700; letter-spacing: .18em; color: var(--coral);
+  }
+  .login-logo .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green); margin-bottom: 2px;
+  }
+  .login-sub { font-size: 13px; color: var(--text2); margin-bottom: 36px; }
+
+  .field-group { margin-bottom: 20px; }
+  .field-group label {
+    display: block; font-size: 10px; font-family: 'JetBrains Mono', monospace;
+    letter-spacing: .1em; color: var(--text3); margin-bottom: 8px;
+  }
+  .field-group input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    padding: 13px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .field-group input:focus {
+    border-color: var(--coral);
+    box-shadow: 0 0 0 3px var(--coral-glow);
+  }
+  .field-group input::placeholder { color: var(--text3); }
+
+  .login-btn {
+    width: 100%;
+    background: var(--coral);
+    color: #fff;
+    border: none;
+    padding: 13px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    cursor: pointer;
+    transition: opacity .15s, transform .1s;
+    margin-top: 4px;
+  }
+  .login-btn:hover { opacity: .92; }
+  .login-btn:active { transform: scale(.99); }
+  .login-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  .login-error {
+    display: none;
+    background: rgba(248,113,113,.08);
+    border: 1px solid rgba(248,113,113,.2);
+    color: #f87171;
+    font-size: 12px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    margin-top: 12px;
+  }
+
+  /* ── APP SHELL ── */
   #app { display: none; min-height: 100vh; }
+
   .sidebar {
     position: fixed; top: 0; left: 0; bottom: 0; width: var(--sidebar-w);
-    background: var(--surface); border-right: 1px solid var(--border);
-    display: flex; flex-direction: column; padding: 24px 0; z-index: 10;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    z-index: 20;
   }
-  .sidebar .brand { padding: 0 20px 24px; border-bottom: 1px solid var(--border); }
-  .sidebar .brand span { font-size: 18px; font-weight: 700; letter-spacing: .1em; color: var(--coral); }
-  .sidebar .brand small { display: block; font-size: 10px; color: var(--muted); letter-spacing: .06em; margin-top: 2px; }
-  .nav { padding: 16px 12px; flex: 1; }
+
+  .sidebar-top {
+    padding: 24px 20px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .brand {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 4px;
+  }
+  .brand-icon {
+    width: 32px; height: 32px;
+    background: var(--coral);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 800; color: #fff; letter-spacing: .08em;
+  }
+  .brand-text { font-size: 15px; font-weight: 700; letter-spacing: .08em; color: var(--text); }
+  .brand-badge {
+    font-size: 9px; font-family: 'JetBrains Mono', monospace;
+    letter-spacing: .1em; color: var(--text3);
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 2px 7px; border-radius: 4px;
+  }
+
+  .company-row {
+    display: flex; align-items: center; gap: 8px; margin-top: 14px;
+  }
+  .company-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  .company-label { font-size: 12px; color: var(--text2); }
+  #company-name { font-size: 12px; color: var(--text); font-weight: 500; }
+
+  .nav { flex: 1; padding: 16px 12px; }
+  .nav-section-label {
+    font-size: 9px; font-family: 'JetBrains Mono', monospace;
+    letter-spacing: .12em; color: var(--text3);
+    padding: 0 8px; margin-bottom: 8px; margin-top: 16px;
+  }
+  .nav-section-label:first-child { margin-top: 0; }
+
   .nav-item {
-    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
-    border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--muted);
-    margin-bottom: 2px; transition: all .15s;
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 10px; border-radius: 7px;
+    cursor: pointer; font-size: 13px; color: var(--text2);
+    margin-bottom: 1px; transition: all .15s; position: relative;
+    user-select: none;
   }
-  .nav-item:hover { background: var(--border); color: var(--text); }
-  .nav-item.active { background: rgba(255,109,74,.12); color: var(--coral); }
-  .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
-  .sidebar-footer { padding: 16px 20px; border-top: 1px solid var(--border); }
-  .company-badge { font-size: 11px; color: var(--muted); }
-  .company-badge strong { display: block; font-size: 13px; color: var(--text); margin-bottom: 2px; }
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active {
+    background: var(--coral-dim);
+    color: var(--coral);
+  }
+  .nav-item.active::before {
+    content: '';
+    position: absolute; left: 0; top: 20%; bottom: 20%;
+    width: 2px; border-radius: 2px;
+    background: var(--coral);
+  }
+  .nav-icon { font-size: 15px; width: 20px; text-align: center; opacity: .7; }
+  .nav-item.active .nav-icon { opacity: 1; }
 
-  .main { margin-left: var(--sidebar-w); padding: 32px; min-height: 100vh; }
-  .page { display: none; }
+  .sidebar-footer {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+    font-size: 11px; color: var(--text3);
+  }
+  .sidebar-footer a { color: var(--coral); text-decoration: none; font-size: 12px; }
+  .sidebar-footer a:hover { opacity: .8; }
+
+  /* ── MAIN ── */
+  .main {
+    margin-left: var(--sidebar-w);
+    padding: 36px 40px;
+    min-height: 100vh;
+    max-width: 1100px;
+  }
+
+  .page { display: none; animation: fadeIn .2s ease; }
   .page.active { display: block; }
-  .page-title { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
-  .page-sub { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-  /* CARDS */
-  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap: 16px; margin-bottom: 32px; }
+  .page-header { margin-bottom: 28px; }
+  .page-header h1 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+  .page-header p { font-size: 13px; color: var(--text2); }
+
+  /* ── STATS ── */
+  .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+
   .stat-card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 10px; padding: 20px 22px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px 24px;
+    position: relative; overflow: hidden;
+    transition: border-color .2s;
   }
-  .stat-card .label { font-size: 10px; letter-spacing: .1em; color: var(--muted); font-family: monospace; margin-bottom: 8px; }
-  .stat-card .value { font-size: 28px; font-weight: 700; color: var(--text); }
-  .stat-card .sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .stat-card:hover { border-color: var(--border2); }
+  .stat-card .s-label {
+    font-size: 9px; font-family: 'JetBrains Mono', monospace;
+    letter-spacing: .12em; color: var(--text3); margin-bottom: 10px;
+  }
+  .stat-card .s-value {
+    font-size: 32px; font-weight: 700; line-height: 1;
+    margin-bottom: 6px;
+  }
+  .stat-card .s-sub { font-size: 11px; color: var(--text2); }
+  .stat-card.accent-coral { border-color: rgba(255,109,74,.2); }
+  .stat-card.accent-coral .s-value { color: var(--coral); }
+  .stat-card.accent-green { border-color: rgba(167,243,208,.15); }
+  .stat-card.accent-green .s-value { color: var(--green); }
+  .stat-card .s-glow {
+    position: absolute; top: -20px; right: -20px;
+    width: 80px; height: 80px; border-radius: 50%;
+    filter: blur(28px); pointer-events: none;
+  }
+  .accent-coral .s-glow { background: rgba(255,109,74,.18); }
+  .accent-green .s-glow { background: rgba(167,243,208,.1); }
 
-  /* UPLOAD */
-  .upload-zone {
-    border: 2px dashed var(--border); border-radius: 10px;
-    padding: 48px 24px; text-align: center; cursor: pointer;
-    transition: all .2s; margin-bottom: 24px; background: var(--surface);
+  /* ── QUICK ACTIONS ── */
+  .quick-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 28px; }
+  .quick-btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px; border-radius: 8px;
+    font-size: 13px; cursor: pointer; transition: all .15s;
+    border: 1px solid var(--border2); background: var(--surface2);
+    color: var(--text2); text-decoration: none;
   }
-  .upload-zone:hover, .upload-zone.drag { border-color: var(--coral); background: rgba(255,109,74,.04); }
-  .upload-zone .icon { font-size: 36px; margin-bottom: 12px; }
-  .upload-zone p { font-size: 14px; color: var(--muted); }
-  .upload-zone strong { color: var(--text); }
+  .quick-btn:hover { border-color: var(--coral); color: var(--text); }
+  .quick-btn.primary { background: var(--coral); color: #fff; border-color: var(--coral); }
+  .quick-btn.primary:hover { opacity: .9; }
+
+  /* ── PANEL CARD ── */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  .panel-head {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .panel-head h3 { font-size: 13px; font-weight: 500; }
+  .panel-head .ph-sub { font-size: 11px; color: var(--text2); }
+
+  /* ── UPLOAD ── */
+  .upload-zone {
+    border: 2px dashed var(--border2); border-radius: var(--radius);
+    padding: 52px 24px; text-align: center; cursor: pointer;
+    transition: all .2s; background: var(--surface); margin-bottom: 16px;
+  }
+  .upload-zone:hover, .upload-zone.drag {
+    border-color: var(--coral);
+    background: var(--coral-dim);
+  }
+  .upload-zone .uz-icon { font-size: 32px; margin-bottom: 14px; opacity: .6; }
+  .upload-zone .uz-main { font-size: 14px; font-weight: 500; margin-bottom: 6px; }
+  .upload-zone .uz-sub { font-size: 12px; color: var(--text2); }
+  .upload-zone .uz-sub span { color: var(--coral); }
   #file-input { display: none; }
 
-  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin: 12px 0; overflow: hidden; display: none; }
-  .progress-fill { height: 100%; background: var(--coral); border-radius: 2px; transition: width .3s; }
+  .progress-wrap { display: none; margin-bottom: 16px; }
+  .progress-label { font-size: 12px; color: var(--text2); margin-bottom: 8px; }
+  .progress-bar { height: 3px; background: var(--border2); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--coral); border-radius: 2px; transition: width .4s ease; width: 0%; }
 
-  /* TABLE */
-  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .upload-msg { font-size: 13px; color: var(--text2); margin-bottom: 20px; min-height: 20px; }
+
+  /* ── TABLE ── */
+  .table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; }
-  th { font-size: 10px; letter-spacing: .08em; color: var(--muted); font-family: monospace; padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); }
-  td { font-size: 13px; padding: 14px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  thead tr { border-bottom: 1px solid var(--border); }
+  th {
+    font-size: 9px; font-family: 'JetBrains Mono', monospace;
+    letter-spacing: .1em; color: var(--text3); padding: 12px 16px;
+    text-align: left; font-weight: 500; white-space: nowrap;
+  }
+  td { font-size: 13px; padding: 14px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   tr:last-child td { border-bottom: none; }
-  tr:hover td { background: rgba(255,255,255,.02); }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-family: monospace; letter-spacing: .06em; }
-  .badge-open { background: rgba(167,243,208,.1); color: var(--green); }
-  .badge-doc { background: rgba(255,109,74,.1); color: var(--coral); }
-  .reply-btn {
-    background: none; border: 1px solid var(--border); color: var(--muted);
-    padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer;
+  tbody tr { transition: background .1s; }
+  tbody tr:hover td { background: var(--surface2); }
+
+  .ticket-id { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--green); }
+  .customer-name { font-weight: 500; margin-bottom: 2px; }
+  .customer-email { font-size: 11px; color: var(--text2); }
+  .issue-text { color: var(--text2); max-width: 260px; line-height: 1.4; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 9px; border-radius: 20px;
+    font-size: 10px; font-family: 'JetBrains Mono', monospace;
+    letter-spacing: .06em; font-weight: 500;
   }
-  .reply-btn:hover { border-color: var(--coral); color: var(--coral); }
-  .empty-state { padding: 48px; text-align: center; color: var(--muted); font-size: 13px; }
+  .badge::before { content: ''; width: 5px; height: 5px; border-radius: 50%; }
+  .badge-open { background: var(--green-dim); color: var(--green); border: 1px solid rgba(167,243,208,.2); }
+  .badge-open::before { background: var(--green); }
+  .badge-doc { background: var(--coral-dim); color: var(--coral); border: 1px solid rgba(255,109,74,.2); }
+  .badge-doc::before { background: var(--coral); }
 
-  /* TOPICS */
-  .topic-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-  .topic-name { font-size: 13px; width: 200px; flex-shrink: 0; }
-  .topic-bar-wrap { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
-  .topic-bar { height: 100%; background: var(--coral); border-radius: 4px; transition: width .6s ease; }
-  .topic-count { font-size: 12px; color: var(--muted); width: 32px; text-align: right; }
+  .action-btn {
+    background: none; border: 1px solid var(--border2); color: var(--text2);
+    padding: 5px 12px; border-radius: 6px; font-size: 11px; cursor: pointer;
+    transition: all .15s; font-family: inherit;
+  }
+  .action-btn:hover { border-color: var(--coral); color: var(--coral); }
 
-  /* DOCS LIST */
-  .doc-item {
+  .date-text { font-size: 11px; color: var(--text3); font-family: 'JetBrains Mono', monospace; }
+
+  /* ── DOC LIST ── */
+  .doc-row {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 16px; border-bottom: 1px solid var(--border);
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
+    transition: background .1s;
   }
-  .doc-item:last-child { border-bottom: none; }
-  .doc-info .doc-name { font-size: 13px; margin-bottom: 3px; }
-  .doc-info .doc-meta { font-size: 11px; color: var(--muted); }
+  .doc-row:last-child { border-bottom: none; }
+  .doc-row:hover { background: var(--surface2); }
+  .doc-icon { font-size: 18px; margin-right: 12px; opacity: .6; }
+  .doc-info { flex: 1; }
+  .doc-name { font-size: 13px; font-weight: 500; margin-bottom: 3px; }
+  .doc-meta { font-size: 11px; color: var(--text2); font-family: 'JetBrains Mono', monospace; }
 
-  /* TOAST */
+  /* ── TOPICS ── */
+  .topic-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 10px 20px; border-bottom: 1px solid var(--border);
+  }
+  .topic-row:last-child { border-bottom: none; }
+  .topic-rank {
+    font-size: 10px; font-family: 'JetBrains Mono', monospace;
+    color: var(--text3); width: 20px; text-align: center; flex-shrink: 0;
+  }
+  .topic-name { font-size: 13px; width: 190px; flex-shrink: 0; }
+  .topic-bar-wrap { flex: 1; height: 6px; background: var(--border2); border-radius: 3px; overflow: hidden; }
+  .topic-bar { height: 100%; background: linear-gradient(90deg, var(--coral), #ff9966); border-radius: 3px; transition: width .8s cubic-bezier(.4,0,.2,1); width: 0%; }
+  .topic-count { font-size: 12px; color: var(--text2); font-family: 'JetBrains Mono', monospace; width: 28px; text-align: right; }
+
+  /* ── EMPTY ── */
+  .empty {
+    padding: 52px 24px; text-align: center;
+    color: var(--text3); font-size: 13px;
+  }
+  .empty .empty-icon { font-size: 28px; margin-bottom: 12px; opacity: .4; }
+
+  /* ── TOAST ── */
   #toast {
     position: fixed; bottom: 24px; right: 24px;
-    background: var(--surface); border: 1px solid var(--border);
-    padding: 12px 20px; border-radius: 8px; font-size: 13px;
-    transform: translateY(80px); opacity: 0; transition: all .3s; z-index: 100;
+    background: var(--surface2); border: 1px solid var(--border2);
+    color: var(--text); padding: 12px 18px; border-radius: 8px;
+    font-size: 13px; opacity: 0; transform: translateY(12px);
+    transition: all .25s; pointer-events: none; z-index: 999;
+    display: flex; align-items: center; gap: 10px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.4);
   }
-  #toast.show { transform: translateY(0); opacity: 1; }
-  #toast.success { border-color: var(--green); color: var(--green); }
-  #toast.error { border-color: #f87171; color: #f87171; }
+  #toast.show { opacity: 1; transform: none; }
+  #toast.ok { border-color: rgba(167,243,208,.3); }
+  #toast.ok::before { content: '✓'; color: var(--green); font-weight: 700; }
+  #toast.err { border-color: rgba(248,113,113,.3); }
+  #toast.err::before { content: '✗'; color: #f87171; font-weight: 700; }
 
-  @media (max-width: 768px) {
-    .sidebar { width: 60px; }
-    .sidebar .brand small, .nav-item span, .sidebar-footer .company-badge { display: none; }
-    .main { margin-left: 60px; padding: 20px 16px; }
+  @media (max-width: 900px) {
+    :root { --sidebar-w: 64px; }
+    .nav-item span, .sidebar-top .company-row, .brand-text, .brand-badge, .sidebar-footer { display: none; }
+    .main { padding: 24px 20px; }
+    .stats-row { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -155,41 +406,56 @@
 <!-- LOGIN -->
 <div id="login-screen">
   <div class="login-card">
-    <div class="logo">ARIA</div>
-    <div class="sub">Admin Panel · Enter your API key to continue</div>
-    <label>API KEY</label>
-    <input type="password" id="api-key-input" placeholder="aria-xxxx-xxxx" autocomplete="off"/>
-    <div id="login-error" class="error-msg" style="display:none"></div>
-    <button class="btn" id="login-btn">Sign in →</button>
+    <div class="login-logo">
+      <div class="wordmark">ARIA</div>
+      <div class="dot"></div>
+    </div>
+    <p class="login-sub">Admin Panel — Enter your API key to continue</p>
+    <div class="field-group">
+      <label>API KEY</label>
+      <input type="password" id="api-key-input" placeholder="aria-xxxx-xxxx-xxxx" autocomplete="off" spellcheck="false"/>
+    </div>
+    <button class="login-btn" id="login-btn">Continue →</button>
+    <div class="login-error" id="login-error"></div>
   </div>
 </div>
 
 <!-- APP -->
 <div id="app">
+
   <aside class="sidebar">
-    <div class="brand">
-      <span>ARIA</span>
-      <small>ADMIN PANEL</small>
+    <div class="sidebar-top">
+      <div class="brand">
+        <div class="brand-icon">A</div>
+        <span class="brand-text">ARIA</span>
+        <span class="brand-badge">ADMIN</span>
+      </div>
+      <div class="company-row">
+        <div class="company-dot"></div>
+        <span id="company-name">—</span>
+        <span class="company-label">· active</span>
+      </div>
     </div>
+
     <nav class="nav">
+      <div class="nav-section-label">WORKSPACE</div>
       <div class="nav-item active" data-page="overview">
-        <span class="icon">◈</span><span>Overview</span>
+        <span class="nav-icon">⊞</span><span>Overview</span>
       </div>
       <div class="nav-item" data-page="knowledge">
-        <span class="icon">⬡</span><span>Knowledge Base</span>
+        <span class="nav-icon">◈</span><span>Knowledge Base</span>
       </div>
+      <div class="nav-section-label">SUPPORT</div>
       <div class="nav-item" data-page="tickets">
-        <span class="icon">◎</span><span>Tickets</span>
+        <span class="nav-icon">◎</span><span>Tickets</span>
       </div>
       <div class="nav-item" data-page="analytics">
-        <span class="icon">▦</span><span>Analytics</span>
+        <span class="nav-icon">▦</span><span>Analytics</span>
       </div>
     </nav>
+
     <div class="sidebar-footer">
-      <div class="company-badge">
-        <strong id="company-name">—</strong>
-        <span>Company</span>
-      </div>
+      <a href="/" target="_blank">↗ Open Aria Chat</a>
     </div>
   </aside>
 
@@ -197,85 +463,121 @@
 
     <!-- OVERVIEW -->
     <div class="page active" id="page-overview">
-      <div class="page-title">Overview</div>
-      <div class="page-sub">Your Aria support agent at a glance</div>
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="label">TOTAL TICKETS</div>
-          <div class="value" id="stat-tickets">—</div>
-          <div class="sub">Escalations raised</div>
+      <div class="page-header">
+        <h1>Good morning ☀️</h1>
+        <p>Here's what's happening with your Aria support agent</p>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-card accent-coral">
+          <div class="s-glow"></div>
+          <div class="s-label">OPEN TICKETS</div>
+          <div class="s-value" id="stat-tickets">—</div>
+          <div class="s-sub">Escalations raised</div>
+        </div>
+        <div class="stat-card accent-green">
+          <div class="s-glow"></div>
+          <div class="s-label">DOCS INDEXED</div>
+          <div class="s-value" id="stat-docs">—</div>
+          <div class="s-sub">In knowledge base</div>
         </div>
         <div class="stat-card">
-          <div class="label">DOCS INDEXED</div>
-          <div class="value" id="stat-docs">—</div>
-          <div class="sub">In knowledge base</div>
-        </div>
-        <div class="stat-card">
-          <div class="label">TOP TOPIC</div>
-          <div class="value" style="font-size:16px;padding-top:6px" id="stat-topic">—</div>
-          <div class="sub">Most asked about</div>
+          <div class="s-label">TOP TOPIC</div>
+          <div class="s-value" id="stat-topic" style="font-size:15px;padding-top:8px;color:var(--text2);font-weight:500;">—</div>
+          <div class="s-sub">Most asked about</div>
         </div>
       </div>
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;">
-        <p style="font-size:12px;letter-spacing:.08em;color:var(--muted);font-family:monospace;margin-bottom:16px;">QUICK LINKS</p>
-        <div style="display:flex;gap:12px;flex-wrap:wrap;">
-          <a href="/" target="_blank" style="color:var(--coral);font-size:13px;text-decoration:none;border:1px solid rgba(255,109,74,.3);padding:8px 16px;border-radius:6px;">Open Aria Chat ↗</a>
-          <button class="reply-btn" onclick="switchPage('knowledge')">Upload a document</button>
-          <button class="reply-btn" onclick="switchPage('tickets')">View tickets</button>
+
+      <div class="quick-row">
+        <a href="/" target="_blank" class="quick-btn primary">↗ Open Aria Chat</a>
+        <button class="quick-btn" onclick="switchPage('knowledge')">⬡ Upload a doc</button>
+        <button class="quick-btn" onclick="switchPage('tickets')">◎ View tickets</button>
+        <button class="quick-btn" onclick="switchPage('analytics')">▦ Analytics</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Recent Tickets</h3>
+          <span class="ph-sub" style="cursor:pointer;color:var(--coral);font-size:12px;" onclick="switchPage('tickets')">View all →</span>
+        </div>
+        <div id="overview-tickets">
+          <div class="empty"><div class="empty-icon">◎</div>No tickets yet</div>
         </div>
       </div>
     </div>
 
     <!-- KNOWLEDGE BASE -->
     <div class="page" id="page-knowledge">
-      <div class="page-title">Knowledge Base</div>
-      <div class="page-sub">Upload documents — Aria learns from them instantly</div>
+      <div class="page-header">
+        <h1>Knowledge Base</h1>
+        <p>Upload documents — Aria learns from them instantly using semantic search</p>
+      </div>
 
       <div class="upload-zone" id="upload-zone">
-        <div class="icon">⬡</div>
-        <p><strong>Drag & drop your file here</strong></p>
-        <p style="margin-top:6px;font-size:12px;">PDF, DOCX or TXT · Max 10MB</p>
+        <div class="uz-icon">⬡</div>
+        <div class="uz-main">Drop your document here</div>
+        <div class="uz-sub">or <span>click to browse</span> · PDF, DOCX, TXT · Max 10MB</div>
         <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt"/>
       </div>
-      <div class="progress-bar" id="progress-bar">
-        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
-      </div>
-      <div id="upload-status" style="font-size:13px;color:var(--muted);margin-bottom:20px;"></div>
 
-      <div class="table-wrap" id="docs-list">
-        <div class="empty-state">No documents indexed yet. Upload one above.</div>
+      <div class="progress-wrap" id="progress-wrap">
+        <div class="progress-label" id="progress-label">Uploading…</div>
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      </div>
+      <div class="upload-msg" id="upload-msg"></div>
+
+      <div class="panel" id="docs-panel">
+        <div class="panel-head">
+          <h3>Indexed Documents</h3>
+          <span class="ph-sub" id="docs-count">—</span>
+        </div>
+        <div id="docs-list">
+          <div class="empty"><div class="empty-icon">◈</div>No documents yet</div>
+        </div>
       </div>
     </div>
 
     <!-- TICKETS -->
     <div class="page" id="page-tickets">
-      <div class="page-title">Tickets</div>
-      <div class="page-sub">Escalations raised by your users</div>
-      <div class="table-wrap">
-        <table id="tickets-table">
-          <thead>
-            <tr>
-              <th>TICKET ID</th>
-              <th>CUSTOMER</th>
-              <th>ISSUE</th>
-              <th>STATUS</th>
-              <th>DATE</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="tickets-body">
-            <tr><td colspan="6" class="empty-state">No tickets yet.</td></tr>
-          </tbody>
-        </table>
+      <div class="page-header">
+        <h1>Tickets</h1>
+        <p>All escalations raised by your users — hit reply to respond directly</p>
+      </div>
+      <div class="panel">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>TICKET</th>
+                <th>CUSTOMER</th>
+                <th>ISSUE</th>
+                <th>STATUS</th>
+                <th>DATE</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tickets-body">
+              <tr><td colspan="6"><div class="empty"><div class="empty-icon">◎</div>No tickets yet</div></td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
     <!-- ANALYTICS -->
     <div class="page" id="page-analytics">
-      <div class="page-title">Analytics</div>
-      <div class="page-sub">What your users ask Aria about most</div>
-      <div class="table-wrap" style="padding:24px;" id="topics-chart">
-        <div class="empty-state">No conversation data yet.</div>
+      <div class="page-header">
+        <h1>Analytics</h1>
+        <p>What your users ask Aria about most — powered by Neo4j graph memory</p>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Top Topics</h3>
+          <span class="ph-sub">by conversation count</span>
+        </div>
+        <div id="topics-list">
+          <div class="empty"><div class="empty-icon">▦</div>No conversation data yet</div>
+        </div>
       </div>
     </div>
 
@@ -286,34 +588,39 @@
 
 <script>
 let API_KEY = '';
-let companyName = '';
 
 // ── AUTH ──────────────────────────────────────────────────────────────────────
 async function login() {
   const key = document.getElementById('api-key-input').value.trim();
   if (!key) return;
   const btn = document.getElementById('login-btn');
-  btn.disabled = true; btn.textContent = 'Checking…';
+  const err = document.getElementById('login-error');
+  btn.disabled = true; btn.textContent = 'Checking…'; err.style.display = 'none';
   try {
     const r = await fetch('/admin/stats', { headers: { 'X-API-Key': key } });
-    if (!r.ok) throw new Error('Invalid key');
+    if (!r.ok) throw new Error('bad key');
     const data = await r.json();
     API_KEY = key;
-    companyName = data.company;
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'block';
-    document.getElementById('company-name').textContent = companyName;
+    document.getElementById('company-name').textContent = data.company;
     populateStats(data);
-    loadAll();
+    loadOverviewTickets();
+    greetByTime();
   } catch {
-    document.getElementById('login-error').style.display = 'block';
-    document.getElementById('login-error').textContent = 'Invalid API key — please try again.';
-    btn.disabled = false; btn.textContent = 'Sign in →';
+    err.textContent = 'Invalid API key — please try again.';
+    err.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Continue →';
   }
 }
-
 document.getElementById('login-btn').addEventListener('click', login);
 document.getElementById('api-key-input').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+
+function greetByTime() {
+  const h = new Date().getHours();
+  const greet = h < 12 ? 'Good morning ☀️' : h < 17 ? 'Good afternoon 👋' : 'Good evening 🌙';
+  document.querySelector('#page-overview .page-header h1').textContent = greet;
+}
 
 // ── NAV ───────────────────────────────────────────────────────────────────────
 function switchPage(name) {
@@ -323,39 +630,64 @@ function switchPage(name) {
   if (name === 'analytics') loadTopics();
   if (name === 'knowledge') loadDocs();
 }
-document.querySelectorAll('.nav-item').forEach(item => item.addEventListener('click', () => switchPage(item.dataset.page)));
+document.querySelectorAll('.nav-item').forEach(i => i.addEventListener('click', () => switchPage(i.dataset.page)));
 
 // ── API ───────────────────────────────────────────────────────────────────────
-const api = (path) => fetch(path, { headers: { 'X-API-Key': API_KEY } }).then(r => r.json());
-
-function loadAll() { loadDocs(); loadTickets(); loadTopics(); }
+const api = p => fetch(p, { headers: { 'X-API-Key': API_KEY } }).then(r => r.json());
 
 // ── STATS ─────────────────────────────────────────────────────────────────────
-function populateStats(data) {
-  document.getElementById('stat-tickets').textContent = data.total_tickets;
-  document.getElementById('stat-docs').textContent = data.docs_indexed;
-  document.getElementById('stat-topic').textContent = data.top_topic;
+function populateStats(d) {
+  document.getElementById('stat-tickets').textContent = d.total_tickets ?? '0';
+  document.getElementById('stat-docs').textContent = d.docs_indexed ?? '0';
+  document.getElementById('stat-topic').textContent = d.top_topic ?? '—';
+}
+
+// ── OVERVIEW TICKETS (last 3) ─────────────────────────────────────────────────
+async function loadOverviewTickets() {
+  const tickets = await api('/admin/tickets');
+  const el = document.getElementById('overview-tickets');
+  if (!tickets.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">◎</div>No tickets yet</div>'; return; }
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;">
+    <thead><tr>
+      <th style="font-size:9px;font-family:JetBrains Mono,monospace;letter-spacing:.1em;color:var(--text3);padding:12px 20px;text-align:left;border-bottom:1px solid var(--border);">TICKET</th>
+      <th style="font-size:9px;font-family:JetBrains Mono,monospace;letter-spacing:.1em;color:var(--text3);padding:12px 20px;text-align:left;border-bottom:1px solid var(--border);">CUSTOMER</th>
+      <th style="font-size:9px;font-family:JetBrains Mono,monospace;letter-spacing:.1em;color:var(--text3);padding:12px 20px;text-align:left;border-bottom:1px solid var(--border);">STATUS</th>
+    </tr></thead>
+    <tbody>${tickets.slice(0,3).map(t => `
+      <tr>
+        <td style="padding:13px 20px;border-bottom:1px solid var(--border);font-family:JetBrains Mono,monospace;font-size:11px;color:var(--green);">#${t.id}</td>
+        <td style="padding:13px 20px;border-bottom:1px solid var(--border);font-size:13px;">${t.customer_name || '—'}</td>
+        <td style="padding:13px 20px;border-bottom:1px solid var(--border);">
+          <span class="badge badge-open">OPEN</span>
+        </td>
+      </tr>`).join('')}
+    </tbody>
+  </table>`;
 }
 
 // ── DOCS ──────────────────────────────────────────────────────────────────────
 async function loadDocs() {
   const docs = await api('/admin/docs');
   const el = document.getElementById('docs-list');
-  if (!docs.length) { el.innerHTML = '<div class="empty-state">No documents indexed yet. Upload one above.</div>'; return; }
-  el.innerHTML = docs.map(d => `
-    <div class="doc-item">
+  document.getElementById('docs-count').textContent = docs.length + ' document' + (docs.length !== 1 ? 's' : '');
+  if (!docs.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">◈</div>No documents indexed yet</div>'; return; }
+  const icons = { pdf: '📄', docx: '📝', doc: '📝', txt: '📃' };
+  el.innerHTML = docs.map(d => {
+    const ext = (d.title || '').split('.').pop().toLowerCase();
+    return `<div class="doc-row">
+      <span class="doc-icon">${icons[ext] || '📄'}</span>
       <div class="doc-info">
         <div class="doc-name">${d.title}</div>
-        <div class="doc-meta">${d.chunks} chunks indexed</div>
+        <div class="doc-meta">${d.chunks} chunks · indexed</div>
       </div>
-      <span class="badge badge-doc">INDEXED</span>
-    </div>`).join('');
+      <span class="badge badge-doc">ACTIVE</span>
+    </div>`;
+  }).join('');
 }
 
 // ── UPLOAD ────────────────────────────────────────────────────────────────────
 const zone = document.getElementById('upload-zone');
 const fileInput = document.getElementById('file-input');
-
 zone.addEventListener('click', () => fileInput.click());
 zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
 zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
@@ -364,28 +696,29 @@ fileInput.addEventListener('change', () => handleFile(fileInput.files[0]));
 
 async function handleFile(file) {
   if (!file) return;
-  const bar = document.getElementById('progress-bar');
+  const wrap = document.getElementById('progress-wrap');
   const fill = document.getElementById('progress-fill');
-  const status = document.getElementById('upload-status');
-  bar.style.display = 'block'; fill.style.width = '20%';
-  status.textContent = `Uploading ${file.name}…`;
-  const form = new FormData();
-  form.append('file', file);
+  const label = document.getElementById('progress-label');
+  const msg = document.getElementById('upload-msg');
+  wrap.style.display = 'block'; fill.style.width = '15%';
+  label.textContent = `Uploading ${file.name}…`; msg.textContent = '';
   try {
-    fill.style.width = '60%';
+    fill.style.width = '55%'; label.textContent = 'Embedding chunks with Pinecone…';
+    const form = new FormData(); form.append('file', file);
     const r = await fetch('/upload', { method: 'POST', headers: { 'X-API-Key': API_KEY }, body: form });
     fill.style.width = '100%';
     const data = await r.json();
     if (!r.ok) throw new Error(data.detail || 'Upload failed');
-    status.textContent = `✓ ${data.file} — ${data.chunks_indexed} chunks indexed`;
-    toast(`${data.chunks_indexed} chunks indexed from ${data.file}`, 'success');
-    setTimeout(() => { bar.style.display = 'none'; fill.style.width = '0%'; }, 1500);
-    loadDocs();
-    api('/admin/stats').then(populateStats);
+    label.textContent = 'Done!';
+    msg.textContent = `✓ ${data.file} — ${data.chunks_indexed} chunks indexed and ready`;
+    msg.style.color = 'var(--green)';
+    toast(`${data.chunks_indexed} chunks indexed`, 'ok');
+    setTimeout(() => { wrap.style.display = 'none'; fill.style.width = '0%'; }, 2000);
+    loadDocs(); api('/admin/stats').then(populateStats);
   } catch (err) {
-    status.textContent = '✗ ' + err.message;
-    toast(err.message, 'error');
-    bar.style.display = 'none';
+    fill.style.width = '0%'; wrap.style.display = 'none';
+    msg.textContent = '✗ ' + err.message; msg.style.color = '#f87171';
+    toast(err.message, 'err');
   }
 }
 
@@ -393,44 +726,52 @@ async function handleFile(file) {
 async function loadTickets() {
   const tickets = await api('/admin/tickets');
   const body = document.getElementById('tickets-body');
-  if (!tickets.length) { body.innerHTML = '<tr><td colspan="6" class="empty-state">No tickets yet.</td></tr>'; return; }
-  body.innerHTML = tickets.map(t => `
-    <tr>
-      <td style="font-family:monospace;color:var(--green);font-size:12px;">#${t.id}</td>
-      <td>
-        <div style="font-size:13px;">${t.customer_name || '—'}</div>
-        <div style="font-size:11px;color:var(--muted);">${t.customer_email || ''}</div>
-      </td>
-      <td style="max-width:260px;color:var(--muted);">${(t.issue || '').slice(0,80)}${(t.issue||'').length>80?'…':''}</td>
-      <td><span class="badge badge-open">${(t.status||'open').toUpperCase()}</span></td>
-      <td style="font-size:11px;color:var(--muted);">${t.created_at ? new Date(t.created_at).toLocaleDateString() : '—'}</td>
-      <td>${t.customer_email ? `<button class="reply-btn" onclick="replyTo('${t.customer_email}','${t.id}')">Reply</button>` : ''}</td>
-    </tr>`).join('');
+  if (!tickets.length) {
+    body.innerHTML = '<tr><td colspan="6"><div class="empty"><div class="empty-icon">◎</div>No tickets yet</div></td></tr>';
+    return;
+  }
+  body.innerHTML = tickets.map(t => `<tr>
+    <td><span class="ticket-id">#${t.id}</span></td>
+    <td>
+      <div class="customer-name">${t.customer_name || '—'}</div>
+      <div class="customer-email">${t.customer_email || ''}</div>
+    </td>
+    <td><div class="issue-text">${(t.issue || '').slice(0, 80)}${(t.issue||'').length > 80 ? '…' : ''}</div></td>
+    <td><span class="badge badge-open">OPEN</span></td>
+    <td><span class="date-text">${t.created_at ? new Date(t.created_at).toLocaleDateString('en-ZA') : '—'}</span></td>
+    <td>${t.customer_email ? `<button class="action-btn" onclick="replyTo('${t.customer_email}','${t.id}')">↩ Reply</button>` : ''}</td>
+  </tr>`).join('');
 }
 
-function replyTo(email, ticketId) {
-  window.open(`mailto:${email}?subject=Re: PulseFlow support ticket %23${ticketId}`, '_blank');
+function replyTo(email, id) {
+  window.open(`mailto:${email}?subject=Re: Your PulseFlow support ticket %23${id}`, '_blank');
 }
 
 // ── TOPICS ────────────────────────────────────────────────────────────────────
 async function loadTopics() {
   const topics = await api('/topics');
-  const el = document.getElementById('topics-chart');
-  if (!topics.length) { el.innerHTML = '<div class="empty-state">No conversation data yet.</div>'; return; }
+  const el = document.getElementById('topics-list');
+  if (!topics.length) { el.innerHTML = '<div class="empty"><div class="empty-icon">▦</div>No conversation data yet</div>'; return; }
   const max = Math.max(...topics.map(t => t.count));
-  el.innerHTML = topics.map(t => `
+  el.innerHTML = topics.map((t, i) => `
     <div class="topic-row">
-      <div class="topic-name">${t.topic}</div>
-      <div class="topic-bar-wrap"><div class="topic-bar" style="width:${Math.round(t.count/max*100)}%"></div></div>
-      <div class="topic-count">${t.count}</div>
+      <span class="topic-rank">${i + 1}</span>
+      <span class="topic-name">${t.topic}</span>
+      <div class="topic-bar-wrap">
+        <div class="topic-bar" style="width:0%" data-w="${Math.round(t.count/max*100)}"></div>
+      </div>
+      <span class="topic-count">${t.count}</span>
     </div>`).join('');
+  setTimeout(() => {
+    document.querySelectorAll('.topic-bar').forEach(b => b.style.width = b.dataset.w + '%');
+  }, 50);
 }
 
 // ── TOAST ─────────────────────────────────────────────────────────────────────
-function toast(msg, type = 'success') {
+function toast(msg, type = 'ok') {
   const el = document.getElementById('toast');
   el.textContent = msg; el.className = 'show ' + type;
-  setTimeout(() => el.className = '', 3000);
+  setTimeout(() => el.className = '', 3200);
 }
 </script>
 </body>
