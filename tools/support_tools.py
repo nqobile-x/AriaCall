@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
+
+logger = logging.getLogger(__name__)
 
 CUSTOMERS = {
     "demo-001": {"id": "demo-001", "name": "Amina Patel", "email": "amina@example.com", "plan": "Pro"},
@@ -191,8 +194,8 @@ def draft_response(state: dict, use_groq: bool = False) -> str:
             content = completion.choices[0].message.content
             if content:
                 return content.strip()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.error("Groq call failed: %s: %s", type(exc).__name__, exc)
 
     # Fallback: use best FAQ directly
     if faq_sources:
