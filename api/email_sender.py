@@ -135,32 +135,30 @@ def _ticket_html(ticket_id: str, issue: str, customer_name: str, customer_email:
 
 
 def send_ticket_email(to_email: str, customer_name: str, ticket_id: str, issue: str) -> bool:
-    """Send a ticket confirmation email via Resend. Returns True on success."""
-    api_key = os.getenv("RESEND_API_KEY")
-    if not api_key:
-        logger.warning("RESEND_API_KEY not set — skipping email")
+    """Send a ticket confirmation email via Gmail SMTP. Returns True on success."""
+    gmail_user = os.getenv("GMAIL_USER")
+    gmail_pass = os.getenv("GMAIL_APP_PASSWORD")
+    if not gmail_user or not gmail_pass:
+        logger.warning("GMAIL_USER or GMAIL_APP_PASSWORD not set — skipping email")
         return False
     try:
-        import httpx
-        # Resend free tier only allows sending to the verified account email.
-        # We send to our own inbox with reply-to set to the user so we can respond directly.
-        owner_email = os.getenv("SUPPORT_INBOX", "nqobilesibiya025@gmail.com")
-        resp = httpx.post(
-            "https://api.resend.com/emails",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={
-                "from": "Aria Support <onboarding@resend.dev>",
-                "to": [owner_email],
-                "reply_to": to_email,
-                "subject": f"[Ticket #{ticket_id}] {customer_name} <{to_email}> — {issue[:60]}",
-                "html": _ticket_html(ticket_id, issue, customer_name, to_email),
-            },
-            timeout=10.0,
-        )
-        if resp.status_code in (200, 201):
-            logger.info("Ticket email sent to %s (ticket %s)", to_email, ticket_id)
-            return True
-        logger.error("Resend error %s: %s", resp.status_code, resp.text[:200])
+        import smtplib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"Your PulseFlow support ticket #{ticket_id}"
+        msg["From"] = f"Aria Support <{gmail_user}>"
+        msg["To"] = to_email
+
+        msg.attach(MIMEText(_ticket_html(ticket_id, issue, customer_name, to_email), "html"))
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(gmail_user, gmail_pass)
+            server.sendmail(gmail_user, to_email, msg.as_string())
+
+        logger.info("Ticket email sent to %s (ticket %s)", to_email, ticket_id)
+        return True
     except Exception as exc:
-        logger.error("Resend exception: %s", exc)
+        logger.error("Gmail SMTP exception: %s", exc)
     return False
