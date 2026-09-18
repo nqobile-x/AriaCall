@@ -24,6 +24,10 @@ def _extract_contact(message: str) -> dict:
 
 from langgraph.graph import END, START, StateGraph
 
+def get_tickets(company_id: str) -> list[dict]:
+    return list(reversed(_tickets[company_id]))
+
+
 from tools.support_tools import (
     account_status_checker,
     create_ticket,
@@ -38,6 +42,9 @@ from tools.support_tools import (
 # In-memory conversation history: {conversation_id: [{"role": ..., "content": ...}]}
 _history: dict[str, list[dict]] = defaultdict(list)
 MAX_HISTORY_TURNS = 6
+
+# In-memory ticket store: {company_id: [ticket_dict]}
+_tickets: dict[str, list[dict]] = defaultdict(list)
 
 
 class SupportState(TypedDict, total=False):
@@ -185,9 +192,19 @@ class SupportAgent:
             _history[conversation_id] = [
                 h for h in _history[conversation_id] if h.get("role") != "pending_escalation"
             ]
-            # Send confirmation email
+            # Store ticket for admin panel
             customer = result.get("customer") or {}
             ticket = result.get("ticket") or {}
+            if ticket:
+                from datetime import datetime, timezone
+                _tickets[company_id].append({
+                    **ticket,
+                    "customer_name": customer.get("name", "Customer"),
+                    "customer_email": customer.get("email", ""),
+                    "issue": message.strip()[:200],
+                    "created_at": ticket.get("created_at", datetime.now(timezone.utc).isoformat()),
+                })
+            # Send confirmation email
             email = customer.get("email")
             if email:
                 from api.email_sender import send_ticket_email

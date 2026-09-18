@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Aria Admin</title>
+<style>
+  :root {
+    --bg: #0a0b0e;
+    --surface: #13141a;
+    --border: #22232d;
+    --coral: #ff6d4a;
+    --green: #a7f3d0;
+    --text: #f0ede8;
+    --muted: #6b6b78;
+    --sidebar-w: 220px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', 'Segoe UI', sans-serif; min-height: 100vh; }
+
+  /* LOGIN */
+  #login-screen {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 24px;
+  }
+  .login-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 48px 40px; width: 100%; max-width: 400px;
+  }
+  .login-card .logo { font-size: 22px; font-weight: 700; letter-spacing: .12em; color: var(--coral); margin-bottom: 8px; }
+  .login-card .sub { font-size: 13px; color: var(--muted); margin-bottom: 32px; }
+  .login-card label { font-size: 11px; letter-spacing: .08em; color: var(--muted); display: block; margin-bottom: 6px; font-family: monospace; }
+  .login-card input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); padding: 12px 14px; border-radius: 6px;
+    font-size: 14px; outline: none; margin-bottom: 16px;
+  }
+  .login-card input:focus { border-color: var(--coral); }
+  .btn {
+    background: var(--coral); color: #fff; border: none; padding: 12px 24px;
+    border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+    width: 100%; letter-spacing: .04em;
+  }
+  .btn:hover { opacity: .9; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .error-msg { color: #f87171; font-size: 12px; margin-top: 8px; }
+
+  /* LAYOUT */
+  #app { display: none; min-height: 100vh; }
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: var(--sidebar-w);
+    background: var(--surface); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; padding: 24px 0; z-index: 10;
+  }
+  .sidebar .brand { padding: 0 20px 24px; border-bottom: 1px solid var(--border); }
+  .sidebar .brand span { font-size: 18px; font-weight: 700; letter-spacing: .1em; color: var(--coral); }
+  .sidebar .brand small { display: block; font-size: 10px; color: var(--muted); letter-spacing: .06em; margin-top: 2px; }
+  .nav { padding: 16px 12px; flex: 1; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--muted);
+    margin-bottom: 2px; transition: all .15s;
+  }
+  .nav-item:hover { background: var(--border); color: var(--text); }
+  .nav-item.active { background: rgba(255,109,74,.12); color: var(--coral); }
+  .nav-item .icon { font-size: 16px; width: 20px; text-align: center; }
+  .sidebar-footer { padding: 16px 20px; border-top: 1px solid var(--border); }
+  .company-badge { font-size: 11px; color: var(--muted); }
+  .company-badge strong { display: block; font-size: 13px; color: var(--text); margin-bottom: 2px; }
+
+  .main { margin-left: var(--sidebar-w); padding: 32px; min-height: 100vh; }
+  .page { display: none; }
+  .page.active { display: block; }
+  .page-title { font-size: 22px; font-weight: 600; margin-bottom: 4px; }
+  .page-sub { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
+
+  /* CARDS */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap: 16px; margin-bottom: 32px; }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 20px 22px;
+  }
+  .stat-card .label { font-size: 10px; letter-spacing: .1em; color: var(--muted); font-family: monospace; margin-bottom: 8px; }
+  .stat-card .value { font-size: 28px; font-weight: 700; color: var(--text); }
+  .stat-card .sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* UPLOAD */
+  .upload-zone {
+    border: 2px dashed var(--border); border-radius: 10px;
+    padding: 48px 24px; text-align: center; cursor: pointer;
+    transition: all .2s; margin-bottom: 24px; background: var(--surface);
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--coral); background: rgba(255,109,74,.04); }
+  .upload-zone .icon { font-size: 36px; margin-bottom: 12px; }
+  .upload-zone p { font-size: 14px; color: var(--muted); }
+  .upload-zone strong { color: var(--text); }
+  #file-input { display: none; }
+
+  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin: 12px 0; overflow: hidden; display: none; }
+  .progress-fill { height: 100%; background: var(--coral); border-radius: 2px; transition: width .3s; }
+
+  /* TABLE */
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  th { font-size: 10px; letter-spacing: .08em; color: var(--muted); font-family: monospace; padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); }
+  td { font-size: 13px; padding: 14px 16px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,.02); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-family: monospace; letter-spacing: .06em; }
+  .badge-open { background: rgba(167,243,208,.1); color: var(--green); }
+  .badge-doc { background: rgba(255,109,74,.1); color: var(--coral); }
+  .reply-btn {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer;
+  }
+  .reply-btn:hover { border-color: var(--coral); color: var(--coral); }
+  .empty-state { padding: 48px; text-align: center; color: var(--muted); font-size: 13px; }
+
+  /* TOPICS */
+  .topic-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .topic-name { font-size: 13px; width: 200px; flex-shrink: 0; }
+  .topic-bar-wrap { flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .topic-bar { height: 100%; background: var(--coral); border-radius: 4px; transition: width .6s ease; }
+  .topic-count { font-size: 12px; color: var(--muted); width: 32px; text-align: right; }
+
+  /* DOCS LIST */
+  .doc-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; border-bottom: 1px solid var(--border);
+  }
+  .doc-item:last-child { border-bottom: none; }
+  .doc-info .doc-name { font-size: 13px; margin-bottom: 3px; }
+  .doc-info .doc-meta { font-size: 11px; color: var(--muted); }
+
+  /* TOAST */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 12px 20px; border-radius: 8px; font-size: 13px;
+    transform: translateY(80px); opacity: 0; transition: all .3s; z-index: 100;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.success { border-color: var(--green); color: var(--green); }
+  #toast.error { border-color: #f87171; color: #f87171; }
+
+  @media (max-width: 768px) {
+    .sidebar { width: 60px; }
+    .sidebar .brand small, .nav-item span, .sidebar-footer .company-badge { display: none; }
+    .main { margin-left: 60px; padding: 20px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="logo">ARIA</div>
+    <div class="sub">Admin Panel · Enter your API key to continue</div>
+    <label>API KEY</label>
+    <input type="password" id="api-key-input" placeholder="aria-xxxx-xxxx" autocomplete="off"/>
+    <div id="login-error" class="error-msg" style="display:none"></div>
+    <button class="btn" id="login-btn">Sign in →</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <span>ARIA</span>
+      <small>ADMIN PANEL</small>
+    </div>
+    <nav class="nav">
+      <div class="nav-item active" data-page="overview">
+        <span class="icon">◈</span><span>Overview</span>
+      </div>
+      <div class="nav-item" data-page="knowledge">
+        <span class="icon">⬡</span><span>Knowledge Base</span>
+      </div>
+      <div class="nav-item" data-page="tickets">
+        <span class="icon">◎</span><span>Tickets</span>
+      </div>
+      <div class="nav-item" data-page="analytics">
+        <span class="icon">▦</span><span>Analytics</span>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="company-badge">
+        <strong id="company-name">—</strong>
+        <span>Company</span>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- OVERVIEW -->
+    <div class="page active" id="page-overview">
+      <div class="page-title">Overview</div>
+      <div class="page-sub">Your Aria support agent at a glance</div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="label">TOTAL TICKETS</div>
+          <div class="value" id="stat-tickets">—</div>
+          <div class="sub">Escalations raised</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">DOCS INDEXED</div>
+          <div class="value" id="stat-docs">—</div>
+          <div class="sub">In knowledge base</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">TOP TOPIC</div>
+          <div class="value" style="font-size:16px;padding-top:6px" id="stat-topic">—</div>
+          <div class="sub">Most asked about</div>
+        </div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;">
+        <p style="font-size:12px;letter-spacing:.08em;color:var(--muted);font-family:monospace;margin-bottom:16px;">QUICK LINKS</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <a href="/" target="_blank" style="color:var(--coral);font-size:13px;text-decoration:none;border:1px solid rgba(255,109,74,.3);padding:8px 16px;border-radius:6px;">Open Aria Chat ↗</a>
+          <button class="reply-btn" onclick="switchPage('knowledge')">Upload a document</button>
+          <button class="reply-btn" onclick="switchPage('tickets')">View tickets</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- KNOWLEDGE BASE -->
+    <div class="page" id="page-knowledge">
+      <div class="page-title">Knowledge Base</div>
+      <div class="page-sub">Upload documents — Aria learns from them instantly</div>
+
+      <div class="upload-zone" id="upload-zone">
+        <div class="icon">⬡</div>
+        <p><strong>Drag & drop your file here</strong></p>
+        <p style="margin-top:6px;font-size:12px;">PDF, DOCX or TXT · Max 10MB</p>
+        <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt"/>
+      </div>
+      <div class="progress-bar" id="progress-bar">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+      <div id="upload-status" style="font-size:13px;color:var(--muted);margin-bottom:20px;"></div>
+
+      <div class="table-wrap" id="docs-list">
+        <div class="empty-state">No documents indexed yet. Upload one above.</div>
+      </div>
+    </div>
+
+    <!-- TICKETS -->
+    <div class="page" id="page-tickets">
+      <div class="page-title">Tickets</div>
+      <div class="page-sub">Escalations raised by your users</div>
+      <div class="table-wrap">
+        <table id="tickets-table">
+          <thead>
+            <tr>
+              <th>TICKET ID</th>
+              <th>CUSTOMER</th>
+              <th>ISSUE</th>
+              <th>STATUS</th>
+              <th>DATE</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tickets-body">
+            <tr><td colspan="6" class="empty-state">No tickets yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ANALYTICS -->
+    <div class="page" id="page-analytics">
+      <div class="page-title">Analytics</div>
+      <div class="page-sub">What your users ask Aria about most</div>
+      <div class="table-wrap" style="padding:24px;" id="topics-chart">
+        <div class="empty-state">No conversation data yet.</div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let API_KEY = '';
+let companyName = '';
+
+// ── AUTH ──────────────────────────────────────────────────────────────────────
+async function login() {
+  const key = document.getElementById('api-key-input').value.trim();
+  if (!key) return;
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true; btn.textContent = 'Checking…';
+  try {
+    const r = await fetch('/admin/stats', { headers: { 'X-API-Key': key } });
+    if (!r.ok) throw new Error('Invalid key');
+    const data = await r.json();
+    API_KEY = key;
+    companyName = data.company;
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('company-name').textContent = companyName;
+    populateStats(data);
+    loadAll();
+  } catch {
+    document.getElementById('login-error').style.display = 'block';
+    document.getElementById('login-error').textContent = 'Invalid API key — please try again.';
+    btn.disabled = false; btn.textContent = 'Sign in →';
+  }
+}
+
+document.getElementById('login-btn').addEventListener('click', login);
+document.getElementById('api-key-input').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+
+// ── NAV ───────────────────────────────────────────────────────────────────────
+function switchPage(name) {
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.toggle('active', i.dataset.page === name));
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
+  if (name === 'tickets') loadTickets();
+  if (name === 'analytics') loadTopics();
+  if (name === 'knowledge') loadDocs();
+}
+document.querySelectorAll('.nav-item').forEach(item => item.addEventListener('click', () => switchPage(item.dataset.page)));
+
+// ── API ───────────────────────────────────────────────────────────────────────
+const api = (path) => fetch(path, { headers: { 'X-API-Key': API_KEY } }).then(r => r.json());
+
+function loadAll() { loadDocs(); loadTickets(); loadTopics(); }
+
+// ── STATS ─────────────────────────────────────────────────────────────────────
+function populateStats(data) {
+  document.getElementById('stat-tickets').textContent = data.total_tickets;
+  document.getElementById('stat-docs').textContent = data.docs_indexed;
+  document.getElementById('stat-topic').textContent = data.top_topic;
+}
+
+// ── DOCS ──────────────────────────────────────────────────────────────────────
+async function loadDocs() {
+  const docs = await api('/admin/docs');
+  const el = document.getElementById('docs-list');
+  if (!docs.length) { el.innerHTML = '<div class="empty-state">No documents indexed yet. Upload one above.</div>'; return; }
+  el.innerHTML = docs.map(d => `
+    <div class="doc-item">
+      <div class="doc-info">
+        <div class="doc-name">${d.title}</div>
+        <div class="doc-meta">${d.chunks} chunks indexed</div>
+      </div>
+      <span class="badge badge-doc">INDEXED</span>
+    </div>`).join('');
+}
+
+// ── UPLOAD ────────────────────────────────────────────────────────────────────
+const zone = document.getElementById('upload-zone');
+const fileInput = document.getElementById('file-input');
+
+zone.addEventListener('click', () => fileInput.click());
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag'); handleFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', () => handleFile(fileInput.files[0]));
+
+async function handleFile(file) {
+  if (!file) return;
+  const bar = document.getElementById('progress-bar');
+  const fill = document.getElementById('progress-fill');
+  const status = document.getElementById('upload-status');
+  bar.style.display = 'block'; fill.style.width = '20%';
+  status.textContent = `Uploading ${file.name}…`;
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    fill.style.width = '60%';
+    const r = await fetch('/upload', { method: 'POST', headers: { 'X-API-Key': API_KEY }, body: form });
+    fill.style.width = '100%';
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'Upload failed');
+    status.textContent = `✓ ${data.file} — ${data.chunks_indexed} chunks indexed`;
+    toast(`${data.chunks_indexed} chunks indexed from ${data.file}`, 'success');
+    setTimeout(() => { bar.style.display = 'none'; fill.style.width = '0%'; }, 1500);
+    loadDocs();
+    api('/admin/stats').then(populateStats);
+  } catch (err) {
+    status.textContent = '✗ ' + err.message;
+    toast(err.message, 'error');
+    bar.style.display = 'none';
+  }
+}
+
+// ── TICKETS ───────────────────────────────────────────────────────────────────
+async function loadTickets() {
+  const tickets = await api('/admin/tickets');
+  const body = document.getElementById('tickets-body');
+  if (!tickets.length) { body.innerHTML = '<tr><td colspan="6" class="empty-state">No tickets yet.</td></tr>'; return; }
+  body.innerHTML = tickets.map(t => `
+    <tr>
+      <td style="font-family:monospace;color:var(--green);font-size:12px;">#${t.id}</td>
+      <td>
+        <div style="font-size:13px;">${t.customer_name || '—'}</div>
+        <div style="font-size:11px;color:var(--muted);">${t.customer_email || ''}</div>
+      </td>
+      <td style="max-width:260px;color:var(--muted);">${(t.issue || '').slice(0,80)}${(t.issue||'').length>80?'…':''}</td>
+      <td><span class="badge badge-open">${(t.status||'open').toUpperCase()}</span></td>
+      <td style="font-size:11px;color:var(--muted);">${t.created_at ? new Date(t.created_at).toLocaleDateString() : '—'}</td>
+      <td>${t.customer_email ? `<button class="reply-btn" onclick="replyTo('${t.customer_email}','${t.id}')">Reply</button>` : ''}</td>
+    </tr>`).join('');
+}
+
+function replyTo(email, ticketId) {
+  window.open(`mailto:${email}?subject=Re: PulseFlow support ticket %23${ticketId}`, '_blank');
+}
+
+// ── TOPICS ────────────────────────────────────────────────────────────────────
+async function loadTopics() {
+  const topics = await api('/topics');
+  const el = document.getElementById('topics-chart');
+  if (!topics.length) { el.innerHTML = '<div class="empty-state">No conversation data yet.</div>'; return; }
+  const max = Math.max(...topics.map(t => t.count));
+  el.innerHTML = topics.map(t => `
+    <div class="topic-row">
+      <div class="topic-name">${t.topic}</div>
+      <div class="topic-bar-wrap"><div class="topic-bar" style="width:${Math.round(t.count/max*100)}%"></div></div>
+      <div class="topic-count">${t.count}</div>
+    </div>`).join('');
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+function toast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.className = 'show ' + type;
+  setTimeout(() => el.className = '', 3000);
+}
+</script>
+</body>
+</html>

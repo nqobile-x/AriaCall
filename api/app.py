@@ -80,6 +80,11 @@ def interface() -> FileResponse:
     return FileResponse(static_dir / "index.html")
 
 
+@app.get("/admin", include_in_schema=False)
+def admin_panel() -> FileResponse:
+    return FileResponse(static_dir / "admin.html")
+
+
 @lru_cache(maxsize=1)
 def kokoro_engine():
     from kokoro_onnx import Kokoro
@@ -241,6 +246,61 @@ async def upload_doc(
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {exc}") from exc
+
+
+@app.get("/admin/tickets")
+def admin_tickets(company: dict = Depends(verify_api_key)) -> list[dict]:
+    from agents.support_agent import get_tickets
+    return get_tickets(company["company_id"])
+
+
+@app.get("/admin/docs")
+def admin_docs(company: dict = Depends(verify_api_key)) -> list[dict]:
+    try:
+        from tools.rag import _get_client
+        pc, index = _get_client()
+        if not pc:
+            return []
+        # Query with zero vector to list all docs for this company
+        import os
+        dummy = [0.0] * 1024
+        results = index.query(
+            vector=dummy,
+            top_k=100,
+            filter={"company_id": {"$eq": company["company_id"]}},
+            include_metadata=True,
+        )
+        seen, docs = set(), []
+        for m in results.matches:
+            title = m.metadata.get("title", "Unknown")
+            if title not in seen:
+                seen.add(title)
+                docs.append({"title": title, "chunks": 0})
+        # Count chunks per doc
+        for m in results.matches:
+            title = m.metadata.get("title", "Unknown")
+            for d in docs:
+                if d["title"] == title:
+                    d["chunks"] += 1
+        return docs
+    except Exception as exc:
+        logger.error("admin_docs error: %s", exc)
+        return []
+
+
+@app.get("/admin/stats")
+def admin_stats(company: dict = Depends(verify_api_key)) -> dict:
+    from agents.support_agent import get_tickets
+    from tools.graph_memory import top_topics
+    tickets = get_tickets(company["company_id"])
+    topics_list = top_topics(limit=1)
+    docs = admin_docs(company)
+    return {
+        "company": company["name"],
+        "total_tickets": len(tickets),
+        "docs_indexed": len(docs),
+        "top_topic": topics_list[0]["topic"] if topics_list else "None yet",
+    }
 
 
 @app.get("/topics")
