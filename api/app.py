@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from agents.support_agent import SupportAgent
+from api.email_sender import send_ticket_email
 
 load_dotenv()
 app = FastAPI(title="Aria Support Agent", version="0.1.0")
@@ -224,6 +225,19 @@ def support(request: SupportRequest) -> SupportResponse:
             customer_id=request.customer_id,
             conversation_id=request.conversation_id or str(uuid4()),
         )
+        # Send ticket confirmation email if escalated and we have customer email
+        if result.get("escalated") and result.get("ticket") and result.get("customer"):
+            customer = result["customer"]
+            ticket = result["ticket"]
+            email = customer.get("email")
+            name = customer.get("name", "there")
+            if email:
+                send_ticket_email(
+                    to_email=email,
+                    customer_name=name,
+                    ticket_id=ticket.get("id", "N/A"),
+                    issue=request.message[:200],
+                )
         return SupportResponse(**result)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
