@@ -52,6 +52,23 @@ def health() -> dict:
     return {"status": "ok", "llm": "groq" if os.getenv("GROQ_API_KEY") else "local fallback"}
 
 
+@app.get("/debug-groq")
+def debug_groq() -> dict:
+    key = os.getenv("GROQ_API_KEY", "")
+    if not key:
+        return {"error": "GROQ_API_KEY not set", "key_preview": None}
+    try:
+        from groq import Groq
+        completion = Groq(api_key=key, timeout=10.0).chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": "Say hi"}],
+            max_tokens=10,
+        )
+        return {"status": "ok", "response": completion.choices[0].message.content, "key_preview": key[:8] + "..."}
+    except Exception as exc:
+        return {"error": type(exc).__name__, "detail": str(exc), "key_preview": key[:8] + "..."}
+
+
 @app.get("/", include_in_schema=False)
 def interface() -> FileResponse:
     return FileResponse(static_dir / "index.html")
