@@ -9,3 +9,5 @@ python-dotenv>=1.0
 python-multipart>=0.0.5
 httpx>=0.24
 spacy>=3.0
+kokoro-onnx>=0.3
+soundfile>=0.12
