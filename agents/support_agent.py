@@ -49,6 +49,9 @@ class SupportState(TypedDict, total=False):
     response: str
     audit_logged: bool
     learning_suggestion: dict | None
+    _needs_contact: bool
+    _awaiting_contact: bool
+    _escalation_reason: str | None
 
 
 class SupportAgent:
