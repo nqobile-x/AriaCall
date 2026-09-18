@@ -8,34 +8,46 @@ const ticketBanner = document.querySelector('#ticket-banner');
 const conversationIdKey = 'aria-conversation-id';
 
 // ── ONBOARDING WIZARD ────────────────────────────────────────────────────────
+// Exposed to window so inline onclick attrs work even if addEventListener is slow
 (function () {
-  if (localStorage.getItem('aria-onboarded')) {
-    const el = document.getElementById('onboard-overlay');
-    if (el) el.classList.add('hidden');
-    return;
-  }
-  let step = 1; const total = 3;
-  const overlay = document.getElementById('onboard-overlay');
-  const nextBtn = document.getElementById('ob-next');
-  const skipBtn = document.getElementById('ob-skip');
-  function goTo(n) {
+  const TOTAL = 3;
+  let step = 1;
+
+  function obOverlay() { return document.getElementById('onboard-overlay'); }
+
+  window.__obDismiss = function () {
+    try { localStorage.setItem('aria-onboarded', '1'); } catch (_) {}
+    const el = obOverlay();
+    if (el) { el.classList.add('hidden'); el.style.display = 'none'; }
+  };
+
+  window.__obGoTo = function (n) {
+    step = n;
     document.querySelectorAll('.ob-step').forEach(s => s.classList.remove('active'));
-    const el = document.getElementById('ob-step-' + n);
-    if (el) el.classList.add('active');
-    for (let i = 1; i <= total; i++) {
+    const stepEl = document.getElementById('ob-step-' + n);
+    if (stepEl) stepEl.classList.add('active');
+    for (let i = 1; i <= TOTAL; i++) {
       const pb = document.getElementById('pb' + i);
       if (pb) pb.className = 'ob-prog-bar' + (i < n ? ' done' : i === n ? ' active' : '');
     }
-    if (nextBtn) nextBtn.textContent = n === total ? 'Start chatting →' : 'Next →';
-    step = n;
-  }
-  function dismiss() {
-    localStorage.setItem('aria-onboarded', '1');
-    if (overlay) overlay.classList.add('hidden');
-  }
-  if (nextBtn) nextBtn.addEventListener('click', () => { if (step < total) goTo(step + 1); else dismiss(); });
-  if (skipBtn) skipBtn.addEventListener('click', dismiss);
-  goTo(1);
+    const nextBtn = document.getElementById('ob-next');
+    if (nextBtn) nextBtn.textContent = n === TOTAL ? 'Start chatting →' : 'Next →';
+  };
+
+  window.__obNext = function () {
+    if (step < TOTAL) window.__obGoTo(step + 1); else window.__obDismiss();
+  };
+
+  // Hide immediately if already seen
+  try {
+    if (localStorage.getItem('aria-onboarded')) {
+      const el = obOverlay();
+      if (el) { el.classList.add('hidden'); el.style.display = 'none'; }
+      return;
+    }
+  } catch (_) {}
+
+  window.__obGoTo(1);
 })();
 
 // ── ARIA WAVE AVATAR ─────────────────────────────────────────────────────────
