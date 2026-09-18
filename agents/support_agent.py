@@ -1,8 +1,22 @@
 from __future__ import annotations
 
 import os
+import re
 from collections import defaultdict
 from typing import Any, TypedDict
+
+
+def _extract_contact(message: str) -> dict:
+    """Pull name and email from a user message like 'Sam Mokoena, sam@x.com'."""
+    email_match = re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", message)
+    email = email_match.group(0).lower() if email_match else None
+    # Name: everything before the email, strip punctuation
+    if email and email_match:
+        before = message[: email_match.start()].strip().rstrip(",").strip()
+        name = before if 2 < len(before) < 60 else None
+    else:
+        name = None
+    return {"name": name, "email": email}
 
 from langgraph.graph import END, START, StateGraph
 
@@ -70,11 +84,42 @@ class SupportAgent:
         return {"faq_sources": faq_search(state["message"])}
 
     def escalate_if_needed(self, state: SupportState) -> dict:
+        history = state.get("history") or []
+        # Check if we're collecting contact info for a pending escalation
+        pending = next((h for h in reversed(history) if h.get("role") == "pending_escalation"), None)
+        if pending:
+            contact = _extract_contact(state["message"])
+            if contact["email"]:
+                ticket = create_ticket(state, pending.get("reason", "User requested escalation"))
+                return {
+                    "escalated": True,
+                    "ticket": ticket,
+                    "customer": {
+                        "name": contact["name"] or "Customer",
+                        "email": contact["email"],
+                    },
+                }
+            # Still waiting for valid email
+            return {"escalated": False, "ticket": None, "_awaiting_contact": True}
+
         escalation = escalation_trigger(state["message"], state.get("account_status"))
-        ticket = create_ticket(state, escalation["reason"]) if escalation["required"] else None
-        return {"escalated": escalation["required"], "ticket": ticket}
+        if escalation["required"]:
+            # Don't create ticket yet — ask for contact details first
+            return {"escalated": False, "ticket": None, "_needs_contact": True, "_escalation_reason": escalation["reason"]}
+        return {"escalated": False, "ticket": None}
 
     def draft(self, state: SupportState) -> dict:
+        if state.get("_needs_contact"):
+            return {"response": (
+                "I'd be happy to escalate this to our human support team right away. "
+                "Could you please share your name and email address so I can create your ticket "
+                "and send you a confirmation?"
+            )}
+        if state.get("_awaiting_contact"):
+            return {"response": (
+                "I didn't quite catch a valid email address. "
+                "Could you share it again? For example: yourname@example.com"
+            )}
         return {"response": draft_response(state, use_groq=bool(os.getenv("GROQ_API_KEY")))}
 
     def propose_learning(self, state: SupportState) -> dict:
@@ -88,13 +133,38 @@ class SupportAgent:
     def handle(self, message: str, customer_id: str | None, conversation_id: str) -> dict[str, Any]:
         if not message.strip():
             raise ValueError("message cannot be empty")
-        history = _history[conversation_id][-MAX_HISTORY_TURNS:]
+        history = _history[conversation_id][-MAX_HISTORY_TURNS * 2:]
         result = dict(self.graph.invoke({
             "message": message.strip(),
             "customer_id": customer_id,
             "conversation_id": conversation_id,
             "history": history,
         }))
+
+        # Persist pending escalation so next turn knows to collect contact info
+        if result.get("_needs_contact"):
+            _history[conversation_id].append({
+                "role": "pending_escalation",
+                "reason": result.get("_escalation_reason", "User requested escalation"),
+            })
+        # Clear pending escalation once ticket is created
+        elif result.get("escalated"):
+            _history[conversation_id] = [
+                h for h in _history[conversation_id] if h.get("role") != "pending_escalation"
+            ]
+            # Send confirmation email
+            customer = result.get("customer") or {}
+            ticket = result.get("ticket") or {}
+            email = customer.get("email")
+            if email:
+                from api.email_sender import send_ticket_email
+                send_ticket_email(
+                    to_email=email,
+                    customer_name=customer.get("name", "there"),
+                    ticket_id=ticket.get("id", "N/A"),
+                    issue=message.strip()[:200],
+                )
+
         _history[conversation_id].append({"role": "user", "content": message.strip()})
         _history[conversation_id].append({"role": "assistant", "content": result.get("response", "")})
         return result
