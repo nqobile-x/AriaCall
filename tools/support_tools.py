@@ -207,19 +207,9 @@ def draft_response(state: dict, use_groq: bool = False) -> str:
 
 def _redact_pii(text: str) -> str:
     """Strip PII from text before writing to the audit log."""
-    try:
-        from presidio_analyzer import AnalyzerEngine
-        from presidio_anonymizer import AnonymizerEngine
-
-        analyzer = AnalyzerEngine()
-        anonymizer = AnonymizerEngine()
-        results = analyzer.analyze(text=text, language="en")
-        return anonymizer.anonymize(text=text, analyzer_results=results).text
-    except Exception:
-        # Fall back to a simple email/phone scrub if presidio is unavailable.
-        cleaned = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "[EMAIL]", text)
-        cleaned = re.sub(r"\b\d[\d\s\-().]{6,}\d\b", "[PHONE]", cleaned)
-        return cleaned
+    cleaned = re.sub(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", "[EMAIL]", text)
+    cleaned = re.sub(r"\b\d[\d\s\-().]{6,}\d\b", "[PHONE]", cleaned)
+    return cleaned
 
 
 def log_interaction(state: dict) -> bool:
