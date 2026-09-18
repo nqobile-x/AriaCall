@@ -17,10 +17,24 @@ os.environ.setdefault("GMAIL_USER", "fake@gmail.com")
 os.environ.setdefault("GMAIL_APP_PASSWORD", "fake")
 
 
+def _load_extract_contact():
+    """Load _extract_contact without importing the full support_agent (avoids langgraph dep)."""
+    import importlib.util, pathlib, re
+    src = pathlib.Path(__file__).parent.parent / "agents" / "support_agent.py"
+    code = src.read_text(encoding="utf-8")
+    # Execute only up to the first external import that would fail
+    safe = "\n".join(
+        line for line in code.splitlines()
+        if not any(x in line for x in ["from langgraph", "from neo4j", "from pinecone", "from groq"])
+    )
+    ns = {"__name__": "agents.support_agent", "re": re, "os": os}
+    exec(compile(safe, str(src), "exec"), ns)
+    return ns["_extract_contact"]
+
+
 class TestExtractContact(unittest.TestCase):
     def _extract(self, msg):
-        from agents.support_agent import _extract_contact
-        return _extract_contact(msg)
+        return _load_extract_contact()(msg)
 
     def test_plain_email(self):
         r = self._extract("test@example.com")

@@ -1,5 +1,25 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="18" fill="#e84c2b"/>
-  <path d="M16 39.5c4.1-1.1 6.1-8.2 9.7-8.2 3.5 0 4.8 7 8.3 7 3.3 0 5.1-13.8 9.8-13.8 2.2 0 3.7 2 4.2 4.4" fill="none" stroke="#f8f1e8" stroke-width="4" stroke-linecap="round"/>
-  <circle cx="16" cy="39.5" r="3" fill="#101010"/><circle cx="48" cy="28.9" r="3" fill="#101010"/>
+  <defs>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="dot-glow" x="-80%" y="-80%" width="360%" height="360%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#0c0d11"/>
+  <!-- glowing pulse / ECG line -->
+  <polyline
+    filter="url(#glow)"
+    points="4,32 14,32 18,27 22,41 27,8 32,54 37,20 42,32 60,32"
+    fill="none"
+    stroke="#ff6d4a"
+    stroke-width="2.6"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <!-- acid green peak dot with glow -->
+  <circle filter="url(#dot-glow)" cx="27" cy="8" r="3.2" fill="#a7f3d0"/>
 </svg>
