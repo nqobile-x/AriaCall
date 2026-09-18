@@ -6,6 +6,16 @@ const status = document.querySelector('#status');
 const voiceNote = document.querySelector('#voice-note');
 const ticketBanner = document.querySelector('#ticket-banner');
 const conversationIdKey = 'aria-conversation-id';
+let selectedVoiceEngine = localStorage.getItem('aria-voice-engine') || 'orpheus';
+document.querySelectorAll('.vbtn').forEach(btn => {
+  if (btn.dataset.engine === selectedVoiceEngine) btn.classList.add('active');
+  else btn.classList.remove('active');
+  btn.addEventListener('click', () => {
+    selectedVoiceEngine = btn.dataset.engine;
+    localStorage.setItem('aria-voice-engine', selectedVoiceEngine);
+    document.querySelectorAll('.vbtn').forEach(b => b.classList.toggle('active', b === btn));
+  });
+});
 let conversationId = localStorage.getItem(conversationIdKey) || crypto.randomUUID();
 localStorage.setItem(conversationIdKey, conversationId);
 // Ping the server every 10 minutes so Render free tier doesn't spin down mid-session.
@@ -47,7 +57,7 @@ async function submit(message = textarea.value.trim()) {
     const spokenReply = data.response.replace(/_Source:.*?_/s, '').trim();
     addMessage('aria', spokenReply, data.faq_sources);
     if (data.escalated && data.ticket) { ticketBanner.hidden = false; ticketBanner.innerHTML = `<strong>HUMAN SUPPORT REQUESTED</strong><br>Ticket ${data.ticket.id} is open.`; }
-    const sound = await fetch('/voice', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text: spokenReply})});
+    const sound = await fetch('/voice', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text: spokenReply, engine: selectedVoiceEngine})});
     if (sound.ok) {
       const audio = new Audio(URL.createObjectURL(await sound.blob())); audio.play();
     } else {

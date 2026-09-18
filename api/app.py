@@ -41,6 +41,7 @@ class SupportResponse(BaseModel):
 
 class VoiceRequest(BaseModel):
     text: str = Field(min_length=1, max_length=5000)
+    engine: str = "orpheus"  # "orpheus" | "edge" | "kokoro"
 
 
 class TranscriptionResponse(BaseModel):
@@ -99,9 +100,11 @@ def whisper_engine():
 
 @app.post("/voice", responses={200: {"content": {"audio/mpeg": {}, "audio/wav": {}}}})
 async def voice(request: VoiceRequest) -> Response:
-    # 1. Groq Orpheus — natural neural TTS, same API key as LLM
+    engine = request.engine
     groq_key = os.getenv("GROQ_API_KEY")
-    if groq_key:
+
+    # Orpheus — Groq neural TTS (tara voice)
+    if engine in ("orpheus", "auto") and groq_key:
         try:
             from groq import Groq
             tts_response = Groq(api_key=groq_key, timeout=30.0).audio.speech.create(
@@ -112,35 +115,39 @@ async def voice(request: VoiceRequest) -> Response:
             )
             return Response(content=tts_response.content, media_type="audio/wav")
         except Exception:
-            pass
+            if engine != "auto":
+                raise HTTPException(status_code=503, detail="Orpheus TTS unavailable.")
 
-    # 2. Edge TTS — Microsoft AriaNeural (free, no key, natural sound)
-    try:
-        import edge_tts
-        communicate = edge_tts.Communicate(request.text, voice="en-US-AriaNeural", rate="+5%", pitch="+0Hz")
-        buffer = BytesIO()
-        async for chunk in communicate.stream():
-            if chunk["type"] == "audio":
-                buffer.write(chunk["data"])
-        if buffer.tell() > 0:
-            return Response(content=buffer.getvalue(), media_type="audio/mpeg")
-    except Exception:
-        pass
-
-    # 3. Kokoro ONNX — local neural voice (needs model files on disk)
-    model_path = Path("voice/models/kokoro-v1.0.onnx")
-    voices_path = Path("voice/models/voices-v1.0.bin")
-    if model_path.exists() and model_path.stat().st_size >= 100_000_000 and voices_path.exists():
+    # Edge TTS — Microsoft AriaNeural (free, no key)
+    if engine in ("edge", "auto"):
         try:
-            import soundfile as sf
-            audio, sample_rate = kokoro_engine().create(request.text, voice="af_heart", speed=1.03, lang="en-us")
+            import edge_tts
+            communicate = edge_tts.Communicate(request.text, voice="en-US-AriaNeural", rate="+5%", pitch="+0Hz")
             buffer = BytesIO()
-            sf.write(buffer, audio, sample_rate, format="WAV")
-            return Response(content=buffer.getvalue(), media_type="audio/wav")
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    buffer.write(chunk["data"])
+            if buffer.tell() > 0:
+                return Response(content=buffer.getvalue(), media_type="audio/mpeg")
         except Exception:
-            pass
+            if engine != "auto":
+                raise HTTPException(status_code=503, detail="Edge TTS unavailable.")
 
-    # 4. No TTS available — browser falls back to speechSynthesis
+    # Kokoro ONNX — local neural voice
+    if engine in ("kokoro", "auto"):
+        model_path = Path("voice/models/kokoro-v1.0.onnx")
+        voices_path = Path("voice/models/voices-v1.0.bin")
+        if model_path.exists() and model_path.stat().st_size >= 100_000_000 and voices_path.exists():
+            try:
+                import soundfile as sf
+                audio, sample_rate = kokoro_engine().create(request.text, voice="af_heart", speed=1.03, lang="en-us")
+                buffer = BytesIO()
+                sf.write(buffer, audio, sample_rate, format="WAV")
+                return Response(content=buffer.getvalue(), media_type="audio/wav")
+            except Exception:
+                if engine != "auto":
+                    raise HTTPException(status_code=503, detail="Kokoro TTS unavailable.")
+
     raise HTTPException(status_code=503, detail="No TTS engine available.")
 
 
