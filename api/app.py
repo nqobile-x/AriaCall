@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -106,35 +106,66 @@ async def voice(request: VoiceRequest) -> Response:
     engine = request.engine
     groq_key = os.getenv("GROQ_API_KEY")
 
-    # Orpheus — Groq neural TTS via raw httpx (avoids SDK version issues)
+    # Orpheus — Groq neural TTS via streaming httpx (avoids buffering full WAV in RAM)
     if engine in ("orpheus", "auto") and groq_key:
         try:
             import httpx
-            resp = httpx.post(
-                "https://api.groq.com/openai/v1/audio/speech",
-                headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
-                json={"model": "canopylabs/orpheus-v1-english", "voice": "tara", "response_format": "wav", "input": request.text},
-                timeout=30.0,
-            )
-            if resp.status_code == 200:
-                return Response(content=resp.content, media_type="audio/wav")
-            logger.error("Orpheus TTS error %s: %s", resp.status_code, resp.text[:300])
+
+            async def orpheus_stream():
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    async with client.stream(
+                        "POST",
+                        "https://api.groq.com/openai/v1/audio/speech",
+                        headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
+                        json={"model": "canopylabs/orpheus-v1-english", "voice": "tara", "response_format": "wav", "input": request.text},
+                    ) as r:
+                        if r.status_code != 200:
+                            body = await r.aread()
+                            logger.error("Orpheus TTS error %s: %s", r.status_code, body[:300])
+                            return
+                        async for chunk in r.aiter_bytes(chunk_size=8192):
+                            yield chunk
+
+            gen = orpheus_stream()
+            # Peek: start the generator; if it errors immediately fall through
+            first = None
+            async for chunk in gen:
+                first = chunk
+                break
+            if first is not None:
+                async def _full_stream(first=first, gen=gen):
+                    yield first
+                    async for c in gen:
+                        yield c
+                return StreamingResponse(_full_stream(), media_type="audio/wav")
+            logger.error("Orpheus TTS returned no audio")
         except Exception as exc:
             logger.error("Orpheus TTS exception: %s", exc)
         if engine != "auto":
             raise HTTPException(status_code=503, detail="Orpheus TTS unavailable.")
 
-    # Edge TTS — Microsoft AriaNeural (free, no key)
+    # Edge TTS — Microsoft AriaNeural (free, no key), stream directly
     if engine in ("edge", "auto"):
         try:
             import edge_tts
-            communicate = edge_tts.Communicate(request.text, voice="en-US-AriaNeural", rate="+5%", pitch="+0Hz")
-            buffer = BytesIO()
-            async for chunk in communicate.stream():
-                if chunk["type"] == "audio":
-                    buffer.write(chunk["data"])
-            if buffer.tell() > 0:
-                return Response(content=buffer.getvalue(), media_type="audio/mpeg")
+
+            async def edge_stream():
+                communicate = edge_tts.Communicate(request.text, voice="en-US-AriaNeural", rate="+5%", pitch="+0Hz")
+                async for chunk in communicate.stream():
+                    if chunk["type"] == "audio":
+                        yield chunk["data"]
+
+            gen = edge_stream()
+            first = None
+            async for chunk in gen:
+                first = chunk
+                break
+            if first is not None:
+                async def _edge_full(first=first, gen=gen):
+                    yield first
+                    async for c in gen:
+                        yield c
+                return StreamingResponse(_edge_full(), media_type="audio/mpeg")
         except Exception as exc:
             logger.error("Edge TTS exception: %s", exc)
             if engine != "auto":
