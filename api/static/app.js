@@ -5,6 +5,9 @@ const mic = document.querySelector('#mic');
 const callBtn = document.querySelector('#call');
 const status = document.querySelector('#status');
 const ticketBanner = document.querySelector('#ticket-banner');
+const callPanel = document.querySelector('#call-panel');
+const cpStatus = document.querySelector('#cp-status');
+const promptPanes = document.querySelector('#prompt-panes');
 const conversationIdKey = 'aria-conversation-id';
 
 // ── ONBOARDING WIZARD ────────────────────────────────────────────────────────
@@ -73,8 +76,31 @@ function setBusy(busy, text = busy ? 'Thinking…' : 'Ready to help') {
   send.disabled = busy;
 }
 
+function showPromptPanes() {
+  if (promptPanes && !promptPanes.classList.contains('visible')) {
+    promptPanes.classList.add('visible');
+  }
+}
+
+function setCpStatus(text) {
+  if (cpStatus) cpStatus.textContent = text;
+}
+
+function openCallPanel() {
+  if (!callPanel) return;
+  callPanel.setAttribute('aria-hidden', 'false');
+  requestAnimationFrame(() => callPanel.classList.add('open'));
+}
+
+function closeCallPanel() {
+  if (!callPanel) return;
+  callPanel.classList.remove('open');
+  callPanel.setAttribute('aria-hidden', 'true');
+}
+
 function addMessage(kind, text, sources = []) {
   document.querySelector('.welcome')?.remove();
+  showPromptPanes();
   const item = document.createElement('article');
   item.className = `message ${kind}`;
   item.innerHTML = `<span class="label">${kind === 'user' ? 'YOU' : 'ARIA'}</span><div></div>`;
@@ -163,12 +189,13 @@ textarea.addEventListener('input', () => {
 textarea.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } });
 send.addEventListener('click', () => submit());
 document.querySelectorAll('[data-prompt]').forEach(btn => btn.addEventListener('click', () => submit(btn.dataset.prompt)));
-document.querySelector('#human-help').addEventListener('click', () => submit('I need a human agent to help me.'));
+document.querySelector('#human-help')?.addEventListener('click', () => submit('I need a human agent to help me.'));
 document.querySelector('#new-chat').addEventListener('click', () => {
   conversationId = crypto.randomUUID();
   localStorage.setItem(conversationIdKey, conversationId);
   conversation.innerHTML = '';
   ticketBanner.hidden = true;
+  promptPanes?.classList.remove('visible');
   textarea.focus();
   setBusy(false, 'New conversation');
   if (inCall) endCall();
@@ -187,6 +214,8 @@ function startCall() {
   callBtn.textContent = '🔴';
   callBtn.title = 'End call';
   setBusy(false, 'CALL ACTIVE — Aria greeting…');
+  openCallPanel();
+  setCpStatus('Connecting…');
 
   const GREETINGS = [
     "Hi, thanks for calling PulseFlow support. I'm Aria. How can I help you today?",
@@ -208,11 +237,16 @@ function startCall() {
 
   // Speak greeting before starting to listen
   callAudioPlaying = true;
+  setCpStatus('Aria is greeting you…');
   const greeting = GREETINGS[Math.floor(Math.random() * GREETINGS.length)];
   addMessage('aria', greeting);
   speak(greeting).then(() => {
     callAudioPlaying = false;
-    if (inCall) { setBusy(false, 'CALL ACTIVE — listening…'); recognition.start(); }
+    if (inCall) {
+      setBusy(false, 'CALL ACTIVE — listening…');
+      setCpStatus('Listening…');
+      recognition.start();
+    }
   });
 
   recognition.onresult = async (e) => {
@@ -222,6 +256,7 @@ function startCall() {
     callAudioPlaying = true;
     addMessage('user', text);
     setBusy(false, 'CALL ACTIVE — Aria speaking…');
+    setCpStatus('Aria is speaking…');
 
     // Speak filler immediately while fetching the real answer
     const filler = FILLERS[Math.floor(Math.random() * FILLERS.length)];
@@ -242,7 +277,11 @@ function startCall() {
       addMessage('aria', `Connection issue: ${err.message}`);
     }
     callAudioPlaying = false;
-    if (inCall) { setBusy(false, 'CALL ACTIVE — listening…'); recognition.start(); }
+    if (inCall) {
+      setBusy(false, 'CALL ACTIVE — listening…');
+      setCpStatus('Listening…');
+      recognition.start();
+    }
   };
 
   recognition.onerror = (e) => {
@@ -266,8 +305,11 @@ function endCall() {
   recognition?.stop();
   recognition = null;
   window.speechSynthesis?.cancel();
+  closeCallPanel();
   setBusy(false, 'Ready to help');
 }
+
+window.__endCall = endCall;
 
 callBtn.addEventListener('click', () => { inCall ? endCall() : startCall(); });
 

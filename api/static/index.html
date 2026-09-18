@@ -188,6 +188,19 @@
       </div>
     </div>
 
+    <!-- CALL PANEL — Clippy-style spring-in from bottom-right -->
+    <div id="call-panel" class="call-panel" role="dialog" aria-label="Aria voice call" aria-hidden="true">
+      <div class="cp-top">
+        <span class="cp-tag">ARIA · LIVE CALL</span>
+        <div class="cp-live-dot" id="cp-dot"></div>
+      </div>
+      <div class="cp-wave-wrap">
+        <img src="/static/aria-call.svg" alt="" aria-hidden="true" class="cp-wave" id="cp-wave"/>
+      </div>
+      <p class="cp-status" id="cp-status">Connecting…</p>
+      <button class="cp-end-btn" id="cp-end-btn" onclick="window.__endCall()">End Call</button>
+    </div>
+
     <main class="app-shell">
       <header>
         <div class="brand"><img src="/static/aria-mark.svg" alt="" /><span>ARIA</span><small>01</small></div>
@@ -212,6 +225,16 @@
       </section>
       <aside id="ticket-banner" class="ticket-banner" hidden></aside>
 
+      <!-- PROMPT PANES — always-on quick suggestions above composer -->
+      <div id="prompt-panes" class="prompt-panes" role="group" aria-label="Quick suggestions">
+        <button class="pp-chip" data-prompt="How do I reset my password?">Reset password</button>
+        <button class="pp-chip" data-prompt="I was charged twice this month">Charged twice</button>
+        <button class="pp-chip" data-prompt="My PulseFlow dashboard isn't loading">Dashboard issue</button>
+        <button class="pp-chip" data-prompt="How do I cancel my subscription?">Cancel subscription</button>
+        <button class="pp-chip" data-prompt="How do I update my billing details?">Update billing</button>
+        <button class="pp-chip pp-human" data-prompt="I need a human agent to help me.">Talk to human</button>
+      </div>
+
       <section class="composer" aria-label="Message Aria">
         <label class="sr-only" for="message">Message Aria</label>
         <textarea id="message" rows="1" placeholder="Message Aria…" maxlength="5000"></textarea>
@@ -226,6 +249,6 @@
         <p class="voice-note" id="voice-note">VOICE MODE · LOCAL KOKORO</p>
       </section>
     </main>
-    <script src="/static/app.js?v=3"></script>
+    <script src="/static/app.js?v=4"></script>
   </body>
 </html>
