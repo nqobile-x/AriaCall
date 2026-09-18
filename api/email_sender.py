@@ -6,7 +6,7 @@ import os
 logger = logging.getLogger(__name__)
 
 
-def _ticket_html(ticket_id: str, issue: str, customer_name: str) -> str:
+def _ticket_html(ticket_id: str, issue: str, customer_name: str, customer_email: str = "") -> str:
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -64,7 +64,13 @@ def _ticket_html(ticket_id: str, issue: str, customer_name: str) -> str:
                     #{ticket_id}
                   </p>
                   <p style="margin:0 0 4px;font-size:10px;letter-spacing:.1em;color:#686872;font-family:monospace;">
-                    YOUR ISSUE
+                    CUSTOMER EMAIL
+                  </p>
+                  <p style="margin:0 0 16px;font-size:14px;color:#a7f3d0;line-height:1.5;">
+                    <a href="mailto:{customer_email}" style="color:#a7f3d0;">{customer_email}</a>
+                  </p>
+                  <p style="margin:0 0 4px;font-size:10px;letter-spacing:.1em;color:#686872;font-family:monospace;">
+                    THEIR ISSUE
                   </p>
                   <p style="margin:0;font-size:14px;color:#f5f1ea;line-height:1.5;">
                     {issue}
@@ -136,14 +142,18 @@ def send_ticket_email(to_email: str, customer_name: str, ticket_id: str, issue: 
         return False
     try:
         import httpx
+        # Resend free tier only allows sending to the verified account email.
+        # We send to our own inbox with reply-to set to the user so we can respond directly.
+        owner_email = os.getenv("SUPPORT_INBOX", "nqobilesibiya025@gmail.com")
         resp = httpx.post(
             "https://api.resend.com/emails",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={
                 "from": "Aria Support <onboarding@resend.dev>",
-                "to": [to_email],
-                "subject": f"Your PulseFlow support ticket #{ticket_id}",
-                "html": _ticket_html(ticket_id, issue, customer_name),
+                "to": [owner_email],
+                "reply_to": to_email,
+                "subject": f"[Ticket #{ticket_id}] {customer_name} <{to_email}> — {issue[:60]}",
+                "html": _ticket_html(ticket_id, issue, customer_name, to_email),
             },
             timeout=10.0,
         )
