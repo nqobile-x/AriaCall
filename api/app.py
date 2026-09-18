@@ -80,24 +80,22 @@ def whisper_engine():
 
 
 @app.post("/voice", responses={200: {"content": {"audio/mpeg": {}, "audio/wav": {}}}})
-def voice(request: VoiceRequest) -> Response:
-    # 1. ElevenLabs — natural neural voice (preferred when key is set)
-    eleven_key = os.getenv("ELEVENLABS_API_KEY")
-    if eleven_key:
-        try:
-            import httpx
-            resp = httpx.post(
-                "https://api.elevenlabs.io/v1/text-to-speech/EXAVITQu4vr4xnSDxMaL",  # Sarah voice
-                headers={"xi-api-key": eleven_key, "Content-Type": "application/json"},
-                json={"text": request.text, "model_id": "eleven_turbo_v2", "voice_settings": {"stability": 0.4, "similarity_boost": 0.8}},
-                timeout=15,
-            )
-            if resp.status_code == 200:
-                return Response(content=resp.content, media_type="audio/mpeg")
-        except Exception:
-            pass  # fall through to Kokoro
+async def voice(request: VoiceRequest) -> Response:
+    # 1. Edge TTS — Microsoft neural voice "Aria" (free, no API key needed)
+    try:
+        import asyncio
+        import edge_tts
+        communicate = edge_tts.Communicate(request.text, voice="en-US-AriaNeural", rate="+5%", pitch="+0Hz")
+        buffer = BytesIO()
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                buffer.write(chunk["data"])
+        if buffer.tell() > 0:
+            return Response(content=buffer.getvalue(), media_type="audio/mpeg")
+    except Exception:
+        pass  # fall through to Kokoro
 
-    # 2. Kokoro ONNX — local neural voice (dev, needs model files)
+    # 2. Kokoro ONNX — local neural voice (needs model files on disk)
     model = Path("voice/models/kokoro-v1.0.onnx")
     voices = Path("voice/models/voices-v1.0.bin")
     if model.exists() and model.stat().st_size >= 100_000_000 and voices.exists():
