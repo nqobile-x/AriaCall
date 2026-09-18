@@ -216,6 +216,32 @@ async def transcribe(audio: UploadFile = File(...)) -> TranscriptionResponse:
         recording.unlink(missing_ok=True)
 
 
+@app.post("/upload")
+async def upload_doc(
+    file: UploadFile = File(...),
+    company_id: str = "default",
+) -> dict:
+    """Ingest a PDF, DOCX or TXT file into Pinecone for RAG search."""
+    allowed = {"pdf", "docx", "doc", "txt"}
+    ext = (file.filename or "").rsplit(".", 1)[-1].lower()
+    if ext not in allowed:
+        raise HTTPException(status_code=415, detail=f"Unsupported file type .{ext}. Use PDF, DOCX or TXT.")
+    data = await file.read()
+    if len(data) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large — max 10MB.")
+    try:
+        from tools.rag import parse_file, ingest_document
+        text = parse_file(data, file.filename)
+        if not text.strip():
+            raise HTTPException(status_code=422, detail="Could not extract text from file.")
+        chunks = ingest_document(text, company_id=company_id, doc_title=file.filename)
+        return {"status": "ok", "file": file.filename, "chunks_indexed": chunks, "company_id": company_id}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Ingestion failed: {exc}") from exc
+
+
 @app.get("/topics")
 def topics() -> list[dict]:
     """Return the most-asked FAQ topics from Neo4j memory."""
