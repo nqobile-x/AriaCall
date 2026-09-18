@@ -7,7 +7,183 @@
     <link rel="icon" href="/static/aria-mark.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
+  <style>
+    /* ── ONBOARDING WIZARD (PasteGate-style) ─────────────────────────── */
+    #onboard-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(7, 8, 12, .82);
+      backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+      animation: obFadeIn .3s ease;
+    }
+    @keyframes obFadeIn { from { opacity: 0 } to { opacity: 1 } }
+    #onboard-overlay.hidden { display: none; }
+
+    .ob-card {
+      background: #13141a;
+      border: 1px solid #252738;
+      border-radius: 18px;
+      width: 100%; max-width: 480px;
+      padding: 0 0 28px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .ob-progress {
+      display: flex; gap: 4px; padding: 20px 28px 0;
+    }
+    .ob-prog-bar {
+      height: 2px; flex: 1; border-radius: 2px;
+      background: #252738; transition: background .3s;
+    }
+    .ob-prog-bar.done { background: #ff6d4a; }
+    .ob-prog-bar.active { background: #ff6d4a; opacity: .5; }
+
+    .ob-step {
+      display: none; padding: 32px 36px 0; text-align: center;
+      animation: obSlide .25s ease;
+    }
+    .ob-step.active { display: block; }
+    @keyframes obSlide { from { opacity: 0; transform: translateX(16px) } to { opacity: 1; transform: none } }
+
+    .ob-icon {
+      width: 64px; height: 64px; margin: 0 auto 20px;
+      border: 1px solid #252738; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px;
+    }
+    .ob-signal-mini {
+      display: flex; gap: 3px; align-items: center; justify-content: center;
+      height: 36px;
+    }
+    .ob-signal-mini span {
+      width: 4px; border-radius: 2px; background: #ff6d4a;
+    }
+
+    .ob-step h2 {
+      font: 600 20px/1.2 'DM Sans', sans-serif;
+      color: #eeeaf4; margin: 0 0 12px;
+    }
+    .ob-step p {
+      font-size: 14px; color: #9898a8; line-height: 1.65;
+      max-width: 340px; margin: 0 auto;
+    }
+    .ob-step p strong { color: #eeeaf4; font-weight: 500; }
+
+    .ob-demo {
+      margin: 20px 0 0; text-align: left;
+      background: #0f1018; border: 1px solid #1e2030;
+      border-radius: 10px; padding: 14px 16px; font-size: 13px;
+    }
+    .ob-demo .user-line {
+      color: #9898a8; margin-bottom: 10px;
+      display: flex; align-items: flex-start; gap: 8px;
+    }
+    .ob-demo .user-line::before { content: 'YOU'; font-size: 9px; color: #4a4a5a; font-family: 'DM Mono', monospace; letter-spacing: .08em; flex-shrink: 0; padding-top: 2px; }
+    .ob-demo .aria-line {
+      color: #eeeaf4;
+      display: flex; align-items: flex-start; gap: 8px;
+    }
+    .ob-demo .aria-line::before { content: 'ARIA'; font-size: 9px; color: #ff6d4a; font-family: 'DM Mono', monospace; letter-spacing: .08em; flex-shrink: 0; padding-top: 2px; }
+
+    .ob-caps {
+      margin: 20px 0 0; display: flex; flex-direction: column; gap: 8px; text-align: left;
+    }
+    .ob-cap {
+      display: flex; align-items: flex-start; gap: 12px;
+      background: #0f1018; border: 1px solid #1e2030;
+      border-radius: 10px; padding: 12px 14px;
+    }
+    .ob-cap-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+    .ob-cap-text strong { display: block; font-size: 13px; color: #eeeaf4; margin-bottom: 3px; }
+    .ob-cap-text span { font-size: 12px; color: #9898a8; }
+
+    .ob-nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 24px 28px 0;
+    }
+    .ob-skip {
+      background: none; border: none; color: #4a4a5a;
+      font: 12px/1 'DM Mono', sans-serif; letter-spacing: .06em;
+      cursor: pointer; padding: 8px 0; transition: color .15s;
+    }
+    .ob-skip:hover { color: #9898a8; }
+    .ob-next {
+      background: #ff6d4a; color: #fff; border: none;
+      padding: 11px 22px; border-radius: 8px;
+      font: 600 13px/1 'DM Sans', sans-serif; letter-spacing: .04em;
+      cursor: pointer; transition: opacity .15s, transform .1s;
+    }
+    .ob-next:hover { opacity: .9; transform: translateY(-1px); }
+  </style>
   <body>
+    <!-- ONBOARDING WIZARD -->
+    <div id="onboard-overlay">
+      <div class="ob-card">
+        <div class="ob-progress">
+          <div class="ob-prog-bar active" id="pb1"></div>
+          <div class="ob-prog-bar" id="pb2"></div>
+          <div class="ob-prog-bar" id="pb3"></div>
+        </div>
+
+        <!-- Step 1 — Welcome -->
+        <div class="ob-step active" id="ob-step-1">
+          <div class="ob-icon" style="background:none;border:none;width:auto;height:auto;margin-bottom:12px;">
+            <img src="/static/aria-wave.svg" alt="Aria" style="width:130px;height:68px;display:block;margin:0 auto;"/>
+          </div>
+          <h2>Hi, I'm Aria 👋</h2>
+          <p>I'm an AI support agent for <strong>PulseFlow</strong>. I can answer your questions instantly, search the knowledge base, and escalate to a human if needed.</p>
+        </div>
+
+        <!-- Step 2 — How to use -->
+        <div class="ob-step" id="ob-step-2">
+          <div class="ob-icon">💬</div>
+          <h2>Just ask, naturally</h2>
+          <p>No forms, no menus. Type or speak your question and I'll find the answer.</p>
+          <div class="ob-demo">
+            <div class="user-line">I was charged twice this month</div>
+            <div class="aria-line">I can see that charge — let me check your billing history. This looks like a duplicate. I'll raise it for review and send you a confirmation.</div>
+          </div>
+        </div>
+
+        <!-- Step 3 — Capabilities -->
+        <div class="ob-step" id="ob-step-3">
+          <div class="ob-icon">✅</div>
+          <h2>What I can help with</h2>
+          <p>Three main areas — and if I'm stuck, I hand off to a real person.</p>
+          <div class="ob-caps">
+            <div class="ob-cap">
+              <span class="ob-cap-icon">💳</span>
+              <div class="ob-cap-text">
+                <strong>Billing & payments</strong>
+                <span>Charges, invoices, refunds, subscriptions</span>
+              </div>
+            </div>
+            <div class="ob-cap">
+              <span class="ob-cap-icon">🔑</span>
+              <div class="ob-cap-text">
+                <strong>Account</strong>
+                <span>Password resets, access, profile updates</span>
+              </div>
+            </div>
+            <div class="ob-cap">
+              <span class="ob-cap-icon">⚙️</span>
+              <div class="ob-cap-text">
+                <strong>Technical issues</strong>
+                <span>Dashboard, integrations, performance</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ob-nav">
+          <button class="ob-skip" id="ob-skip">Skip</button>
+          <button class="ob-next" id="ob-next">Next →</button>
+        </div>
+      </div>
+    </div>
+
     <main class="app-shell">
       <header>
         <div class="brand"><img src="/static/aria-mark.svg" alt="" /><span>ARIA</span><small>01</small></div>
@@ -16,7 +192,7 @@
 
       <section id="conversation" class="conversation" aria-live="polite">
         <div class="welcome">
-          <div class="signal" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+          <img src="/static/aria-wave.svg" class="aria-wave" alt="" aria-hidden="true" id="aria-signal"/>
           <p class="eyebrow">PULSEFLOW SUPPORT / ARIA</p>
           <h1>Hi, I'm Aria.</h1>
           <p class="aria-intro">I handle PulseFlow support. Ask me about <span>billing</span>, your <span>account</span>, or <span>technical issues</span> — I'll search our knowledge base and respond instantly. If I can't resolve it, I'll raise a ticket and loop in a human.</p>
