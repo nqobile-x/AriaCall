@@ -1,0 +1,134 @@
+[
+  {
+    "title": "Password Reset",
+    "text": "To reset your password, click Forgot Password on the login page and enter your registered email address. I will send you a secure link to create a new password within a few minutes. Check your spam folder if the email does not appear in your main inbox."
+  },
+  {
+    "title": "Two-Factor Authentication (2FA)",
+    "text": "To enable two-factor authentication, navigate to your Account Settings and select Security. Follow the prompts to scan the QR code using your preferred authenticator app. Once configured, you will enter a six-digit verification code each time you log in."
+  },
+  {
+    "title": "Locked Account Recovery",
+    "text": "If your account is locked due to multiple failed login attempts, please wait 15 minutes before trying again. Alternatively, click Unlock Account on the login screen to receive a security verification link via email. Contact support if you continue experiencing issues."
+  },
+  {
+    "title": "Updating Your Email Address",
+    "text": "To update your primary email address, go to Account Settings and click Edit next to Profile Information. Enter your new email address and confirm your current password to save changes. I will send a confirmation link to your new address to verify ownership."
+  },
+  {
+    "title": "Account Deletion",
+    "text": "To permanently delete your account, visit Account Settings, scroll to the bottom, and select Delete Account. Please note that this action immediately removes all your workspace data, projects, and personal details permanently. You must cancel active paid subscriptions before initiating deletion."
+  },
+  {
+    "title": "Updating Payment Method",
+    "text": "To update your billing details or credit card, go to Settings and click Billing Overview. Select Update Payment Method, enter your new card details or PayPal account, and save your changes. Your next billing cycle will automatically charge the new payment method."
+  },
+  {
+    "title": "Accessing Invoices",
+    "text": "To view and download past receipts or tax invoices, navigate to Settings and select Billing Overview. Scroll to the Invoice History section to download PDF copies of any past charge. You can also add custom billing contact details or company tax IDs for future invoices."
+  },
+  {
+    "title": "Failed Payment Resolution",
+    "text": "If your payment fails, I will send you an email notification and retry the transaction automatically within 3 days. Please check that your payment card is valid, has sufficient funds, and is enabled for international online transactions. Update your billing details promptly to avoid service interruption."
+  },
+  {
+    "title": "Requesting a Refund",
+    "text": "To request a refund, submit a request through our Billing Support page within 14 days of purchase. Refunds are processed according to our standard terms of service for eligible annual plans or accidental duplicate charges. Approved refunds typically appear on your statement within 5 to 10 business days."
+  },
+  {
+    "title": "Tax and VAT Information",
+    "text": "To add or update your company VAT number or tax identifier, navigate to Settings and select Billing Overview. Enter your registered tax number in the Tax ID field before finalizing your transaction. Applicable local taxes or VAT will be automatically calculated and reflected on your invoices."
+  },
+  {
+    "title": "Upgrading Your Subscription Plan",
+    "text": "To upgrade your subscription plan, go to Settings and click Subscription Plans. Select your desired plan tier and choose between monthly or annual billing options. Your new features will activate immediately, and prorated charges for the remainder of your billing period will be applied."
+  },
+  {
+    "title": "Downgrading Your Subscription Plan",
+    "text": "To downgrade to a lower plan tier, go to Settings and select Subscription Plans. Choose the plan you wish to switch to and confirm your selection. Your current plan features remain active until the end of your current billing cycle, after which the downgrade takes effect."
+  },
+  {
+    "title": "Canceling Your Subscription",
+    "text": "To cancel your paid subscription, navigate to Settings, select Subscription Plans, and click Cancel Subscription. You will maintain full access to all paid features until the final day of your current billing period. No further recurring charges will occur after cancellation."
+  },
+  {
+    "title": "Pausing Your Subscription",
+    "text": "To temporarily pause your subscription, go to Settings, select Subscription Plans, and choose Pause Subscription. You can pause your plan for up to three months without losing your saved workspace settings or historical data. Your billing will automatically resume at the end of the pause period."
+  },
+  {
+    "title": "Free Trial Rules and Features",
+    "text": "Your 14-day free trial gives you full access to all premium features without requiring a credit card upfront. I will send you a reminder email three days before your trial expires. If you choose not to select a paid plan before the trial ends, your account will convert to the free basic tier."
+  },
+  {
+    "title": "Feature Breakdown by Plan Tier",
+    "text": "To compare features included across Starter, Professional, and Enterprise plans, visit Settings and click Compare Plans. Higher tiers include advanced analytics, unlimited team seats, priority API access, and dedicated human support. You can change your plan at any time to suit your growing operational needs."
+  },
+  {
+    "title": "Login Failures Troubleshooting",
+    "text": "If you cannot log in, verify that your email address and password are entered correctly without trailing spaces. Try clearing your browser cache and cookies or opening an incognito window. If you use Single Sign-On, ensure your third-party provider credentials are functioning properly."
+  },
+  {
+    "title": "Page Loading and Display Errors",
+    "text": "If a page fails to load or displays incorrectly, refresh your browser or disable third-party browser extensions like ad blockers. Ensure your internet connection is stable and active. Switching to a supported browser like Chrome or Firefox often resolves localized display glitches."
+  },
+  {
+    "title": "System Performance and Slow Loading",
+    "text": "If the application runs slowly, check our official Status Page to see if system maintenance or an unexpected outage is ongoing. Close unnecessary browser tabs and background applications to free up system memory. Clearing temporary browser data can also improve loading speed."
+  },
+  {
+    "title": "Browser Compatibility Requirements",
+    "text": "Our web application is optimized for the latest two major versions of Chrome, Safari, Firefox, and Microsoft Edge. For the best performance and security, keep your web browser updated to the latest version. Legacy browsers or unsupported WebKit builds may experience degraded functionality."
+  },
+  {
+    "title": "Mobile App Support",
+    "text": "You can download our mobile app for iOS and Android directly from the Apple App Store or Google Play Store. The mobile app syncs seamlessly with your desktop workspace in real time. Ensure your mobile operating system is updated to iOS 15 or Android 10 or higher for full feature compatibility."
+  },
+  {
+    "title": "Exporting Your Workspace Data",
+    "text": "To export your data, go to Settings and click Data Management. Select your preferred output format, such as CSV or JSON, and click Generate Export. I will prepare your downloadable data package and email you a secure download link once processing is complete."
+  },
+  {
+    "title": "GDPR and POPIA Rights",
+    "text": "We strictly uphold your data privacy rights under GDPR, POPIA, and global regulations. You have the right to access, rectify, restrict processing, or request portability of your personal data at any time. Submit your formal privacy inquiry through our dedicated Privacy Portal to reach our Compliance Officer."
+  },
+  {
+    "title": "Data Storage and Protection Policy",
+    "text": "Your data is encrypted both in transit using TLS 1.3 and at rest using AES-256 encryption standards. We host data in secure, ISO-compliant data centers with regular automated backups and continuous vulnerability monitoring. We never sell or share your personal information with third parties for marketing purposes."
+  },
+  {
+    "title": "Data Removal Request",
+    "text": "To request full erasure of your personal data from our active systems and backup logs, email privacy@example.com or use the Privacy Portal. We process all data deletion requests within 30 days in compliance with legal standards. You will receive a final confirmation once your data is permanently expunged."
+  },
+  {
+    "title": "Connecting Third-Party Tools",
+    "text": "To connect third-party integrations like Slack, Zapier, or Google Workspace, navigate to Settings and select Integrations. Choose the application you wish to link and click Authorize to follow the simple setup wizard. Active integrations sync data automatically based on your configured trigger rules."
+  },
+  {
+    "title": "Managing API Keys",
+    "text": "To generate or manage API keys, go to Settings, select Developer API, and click Create New Key. Keep your API secret key secure and never share it in public code repositories or client-side code. You can revoke, rotate, or regenerate existing API keys at any time from your dashboard."
+  },
+  {
+    "title": "Setting Up Webhooks",
+    "text": "To configure webhooks for real-time event notifications, navigate to Settings, select Developer API, and click Add Webhook. Enter your destination payload URL and select the specific event triggers you want to monitor. You can send test event payloads directly from the dashboard to verify your endpoint response."
+  },
+  {
+    "title": "API Rate Limits",
+    "text": "API requests are governed by rate limits based on your active subscription tier to maintain system stability. Standard accounts are permitted up to 1,000 requests per minute, while Enterprise tiers enjoy higher throughput thresholds. If you exceed the rate limit, the API returns a 429 Too Many Requests response code."
+  },
+  {
+    "title": "Escalation Criteria to Human Support",
+    "text": "I am equipped to handle most everyday account, billing, and technical questions instantly. However, if your issue involves complex account recovery, custom contractual agreements, or persistent technical glitches, I will offer to escalate your case. You can request a human specialist at any time during our conversation."
+  },
+  {
+    "title": "How to Reach a Human Agent",
+    "text": "To speak directly with a human support agent, type Talk to a human or Request support agent in our chat window. I will collect a brief description of your issue and transfer your conversation to the next available specialist. You can also submit a ticket through our Help Desk portal."
+  },
+  {
+    "title": "Expected Response Times",
+    "text": "Our human support team is available Monday through Friday across global time zones. Priority support for Enterprise customers guarantees an initial response within 1 hour, while standard ticket requests are answered within 24 business hours. You can track your ticket progress anytime via the Help Desk portal."
+  },
+  {
+    "title": "Handling Urgent Issues",
+    "text": "For critical system outages or security emergencies affecting active business operations, select Urgent Escalation when submitting your support request. Urgent tickets are automatically routed to our 24/7 on-call engineering team for immediate review. Please reserve urgent tagging for severe service-impacting incidents."
+  }
+]

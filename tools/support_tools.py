@@ -63,7 +63,18 @@ def faq_search(message: str) -> list[dict]:
 
 
 def _knowledge_base_documents() -> list[dict]:
-    """Load and chunk Obsidian notes using LangChain, with no hosted vector DB."""
+    """Load knowledge base from bundled JSON, falling back to Obsidian vault if present."""
+    import json
+
+    # Bundled knowledge base — always available on Render
+    kb_json = Path(__file__).parent.parent / "knowledge_base.json"
+    if kb_json.exists():
+        try:
+            return json.loads(kb_json.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            pass
+
+    # Optional Obsidian vault for local development
     vault = Path(os.getenv("OBSIDIAN_VAULT", "obsidian-vault"))
     kb_dir = vault / "Aria Support" / "Knowledge Base"
     if not kb_dir.exists():
@@ -88,7 +99,6 @@ def _knowledge_base_documents() -> list[dict]:
                 documents.append({"title": title, "text": body, "path": str(source)})
         return documents
     except (ImportError, OSError):
-        # The starter FAQs still keep the service available if the local loader fails.
         return []
 
 
