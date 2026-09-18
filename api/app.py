@@ -83,6 +83,11 @@ def debug_groq() -> dict:
 
 
 @app.get("/", include_in_schema=False)
+def landing() -> FileResponse:
+    return FileResponse(static_dir / "landing.html")
+
+
+@app.get("/chat", include_in_schema=False)
 def interface() -> FileResponse:
     return FileResponse(static_dir / "index.html")
 
