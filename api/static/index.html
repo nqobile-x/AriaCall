@@ -203,7 +203,17 @@
           <img src="/static/aria-call.svg" alt="" aria-hidden="true" class="cp-wave" id="cp-wave"/>
         </div>
         <p class="cp-status" id="cp-status">Connecting…</p>
-        <button class="cp-end-btn" id="cp-end-btn" type="button">End Call</button>
+        <div style="display:flex;gap:12px;justify-content:center;align-items:center;">
+          <button id="cp-mute" type="button" aria-label="Mute microphone" title="Mute"
+            style="width:44px;height:44px;border-radius:50%;border:2px solid #ff6d4a;background:transparent;
+                   color:#ff6d4a;cursor:pointer;display:flex;align-items:center;justify-content:center;">
+            <svg id="cp-mute-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/>
+            </svg>
+          </button>
+          <button class="cp-end-btn" id="cp-end-btn" type="button">End Call</button>
+        </div>
       </div>
     </div>
 

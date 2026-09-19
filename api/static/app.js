@@ -11,6 +11,7 @@ const cpMinimize = document.querySelector('#cp-minimize');
 const cpExpand = document.querySelector('#cp-expand');
 const cpEndMini = document.querySelector('#cp-end-mini');
 const cpEndButton = document.querySelector('#cp-end-btn');
+const cpMuteBtn = document.querySelector('#cp-mute');
 const promptPanes = document.querySelector('#prompt-panes');
 const conversationIdKey = 'aria-conversation-id';
 
@@ -305,11 +306,33 @@ document.querySelector('#new-chat').addEventListener('click', () => {
 let inCall = false;
 let recognition = null;
 let callAudioPlaying = false;
+let callMuted = false;
+
+function setMuted(muted) {
+  callMuted = muted;
+  if (cpMuteBtn) {
+    cpMuteBtn.title = muted ? 'Unmute' : 'Mute';
+    cpMuteBtn.setAttribute('aria-label', muted ? 'Unmute microphone' : 'Mute microphone');
+    cpMuteBtn.style.background = muted ? '#ff6d4a' : 'transparent';
+    cpMuteBtn.style.color = muted ? '#fff' : '#ff6d4a';
+  }
+  if (muted) {
+    recognition?.stop();
+    setCpStatus('Muted');
+  } else if (inCall && !callAudioPlaying) {
+    setBusy(false, 'CALL ACTIVE — listening…');
+    setCpStatus('Listening…');
+    recognition?.start();
+  }
+}
+
+cpMuteBtn?.addEventListener('click', () => setMuted(!callMuted));
 
 function startCall() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { alert('Your browser does not support speech recognition. Try Chrome.'); return; }
   inCall = true;
+  callMuted = false;
   callBtn.classList.add('in-call');
   callBtn.setAttribute('aria-label', 'End voice call');
   callBtn.title = 'End call';
@@ -350,8 +373,9 @@ function startCall() {
   });
 
   recognition.onresult = async (e) => {
+    if (callMuted) return;
     const text = e.results[0][0].transcript.trim();
-    if (!text) { if (inCall && !callAudioPlaying) recognition.start(); return; }
+    if (!text) { if (inCall && !callAudioPlaying && !callMuted) recognition.start(); return; }
     recognition.stop();
     callAudioPlaying = true;
     addMessage('user', text);
@@ -385,12 +409,12 @@ function startCall() {
   };
 
   recognition.onerror = (e) => {
-    if (e.error === 'no-speech' && inCall && !callAudioPlaying) { recognition.start(); return; }
+    if (e.error === 'no-speech' && inCall && !callAudioPlaying && !callMuted) { recognition.start(); return; }
     if (e.error !== 'aborted') setBusy(false, `CALL — mic error: ${e.error}`);
   };
 
   recognition.onend = () => {
-    if (inCall && !callAudioPlaying) recognition.start();
+    if (inCall && !callAudioPlaying && !callMuted) recognition.start();
   };
 
   recognition.start();
@@ -399,6 +423,7 @@ function startCall() {
 function endCall() {
   inCall = false;
   callAudioPlaying = false;
+  setMuted(false);
   callBtn.classList.remove('in-call');
   callBtn.setAttribute('aria-label', 'Start voice call');
   callBtn.title = 'Start voice call';
