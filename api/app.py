@@ -135,7 +135,7 @@ async def voice(request: VoiceRequest) -> Response:
                         "POST",
                         "https://api.groq.com/openai/v1/audio/speech",
                         headers={"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"},
-                        json={"model": "canopylabs/orpheus-v1-english", "voice": "tara", "response_format": "wav", "input": request.text},
+                        json={"model": "canopylabs/orpheus-v1-english", "voice": "diana", "response_format": "wav", "input": request.text},
                     ) as r:
                         if r.status_code != 200:
                             body = await r.aread()
