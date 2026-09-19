@@ -127,7 +127,13 @@ class SupportAgent:
 
         escalation = escalation_trigger(state["message"], state.get("account_status"))
         if escalation["required"]:
-            # Don't create ticket yet — ask for contact details first
+            # If message already has contact info, create ticket immediately
+            contact = _extract_contact(state["message"])
+            if contact["email"]:
+                customer = state.get("customer") or {"name": contact["name"] or "Customer", "email": contact["email"]}
+                ticket = create_ticket(state, escalation["reason"])
+                return {"escalated": True, "ticket": ticket, "customer": customer}
+            # No email in message — ask for contact details first
             return {"escalated": False, "ticket": None, "_needs_contact": True, "_escalation_reason": escalation["reason"]}
         return {"escalated": False, "ticket": None}
 
