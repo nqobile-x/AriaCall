@@ -108,6 +108,23 @@ OBSIDIAN_VAULT=C:\Users\nqobile\Desktop\OBSIDIAN\Nqobz\AriaCall
 | 2026-09-17 | Ticket banner — shows ticket ID on escalation in fixed position UI |
 | 2026-09-17 | Voice UX: silence detection, one tap to record |
 | 2026-09-17 | Verified combined suite: 4/4 tests passing |
+| 2026-09-19 | UI audit: replaced wizard/composer emoji controls with custom SVG icons; voice-call panel now supports minimise, restore, and expanded states without altering the Aria wave animation |
+
+## Coordination note — user direction
+
+- The user deploys with **Render**. Do not remove, replace, or reconfigure Render, the deployed voice model, or backend behaviour without explicit approval.
+- ChatGPT reverted exploratory backend, model-path, test, and voice-selector changes made during an audit. The requested UI-only icon/call-panel changes remain; the Aria wave animation is untouched.
+
+## Handoff to Claude — 2026-09-19
+
+ChatGPT completed the user-requested frontend-only polish:
+
+- Replaced onboarding and composer emoji controls with custom inline SVG icons.
+- Added call-card controls for minimise, restore, expand, and end-call; verified the two resize states in the browser.
+- Preserved the existing Aria wave assets and animation.
+- Verified `api/static/app.js` syntax and confirmed the removed emoji set is absent from the user-facing chat UI.
+
+No intentional changes remain in `api/app.py`, `agents/`, `tools/`, Render configuration, model files, email delivery, or voice-engine selection. Please preserve that boundary unless the user explicitly requests otherwise.
 
 ---
 
