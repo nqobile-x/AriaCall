@@ -36,30 +36,79 @@ class TestExtractContact(unittest.TestCase):
     def _extract(self, msg):
         return _load_extract_contact()(msg)
 
+    def _name(self, msg):
+        return (self._extract(msg)["name"] or "").lower()
+
+    def _email(self, msg):
+        return self._extract(msg)["email"]
+
+    # ── email-only ──────────────────────────────────────────────────────────────
     def test_plain_email(self):
         r = self._extract("test@example.com")
         self.assertEqual(r["email"], "test@example.com")
         self.assertIsNone(r["name"])
-
-    def test_name_and_email_labelled(self):
-        r = self._extract("name : nqobile   email : nqobile@test.com")
-        self.assertEqual(r["name"], "nqobile")
-        self.assertEqual(r["email"], "nqobile@test.com")
-
-    def test_natural_sentence(self):
-        r = self._extract("My name is Aria and my email is aria@test.com")
-        self.assertIsNotNone(r["name"])
-        self.assertIn("aria", r["name"].lower())
-        self.assertEqual(r["email"], "aria@test.com")
 
     def test_just_name_no_email(self):
         r = self._extract("just a name no email")
         self.assertIsNone(r["name"])
         self.assertIsNone(r["email"])
 
+    # ── labeled formats ─────────────────────────────────────────────────────────
+    def test_name_label_colon(self):
+        self.assertIn("nqobile", self._name("name : nqobile   email : nqobile@test.com"))
+        self.assertEqual(self._email("name : nqobile   email : nqobile@test.com"), "nqobile@test.com")
+
+    def test_name_label_is(self):
+        self.assertIn("aria", self._name("My name is Aria and my email is aria@test.com"))
+
+    def test_name_after_email_label(self):
+        self.assertIn("fatima", self._name("email: fatima@example.com, name: Fatima"))
+
+    # ── natural sentence ────────────────────────────────────────────────────────
+    def test_im_prefix(self):
+        self.assertIn("nqobza", self._name("I'm Nqobza, nqobza@test.com"))
+
+    def test_iam_prefix(self):
+        self.assertIn("sipho", self._name("I am Sipho, sipho@test.com"))
+
+    def test_this_is(self):
+        self.assertIn("lerato", self._name("This is Lerato lerato@test.com"))
+
+    def test_call_me(self):
+        self.assertIn("sam", self._name("Call me Sam, sam@example.com"))
+
+    def test_here_suffix(self):
+        self.assertIn("amina", self._name("Amina here, amina@example.com — charged twice"))
+
+    # ── name before email (comma / dash / space) ────────────────────────────────
+    def test_name_comma_email(self):
+        self.assertIn("nqobile", self._name("Nqobile, nqobile@example.com"))
+
+    def test_name_dash_email(self):
+        self.assertIn("nqobza", self._name("Nqobza - nqobza@example.com charged twice"))
+
+    def test_full_name_before_email(self):
+        self.assertIn("amina", self._name("Amina Patel amina@example.com"))
+
+    # ── email before name ───────────────────────────────────────────────────────
+    def test_email_then_name(self):
+        self.assertIn("nqobza", self._name("nqobza@test.com - Nqobza here"))
+
+    def test_email_comma_name(self):
+        self.assertIn("sipho", self._name("sipho@test.com, Sipho Dlamini"))
+
+    # ── sentence with context noise ─────────────────────────────────────────────
+    def test_full_sentence_with_issue(self):
+        self.assertIn("nqobza", self._name(
+            "NQOBZA_08@outlook.com - I was charged twice this month, my name is Nqobza"
+        ))
+
+    def test_greeting_then_name(self):
+        self.assertIn("lerato", self._name("Hi Lerato, lerato@example.com needs help"))
+
+    # ── colon format (existing) ──────────────────────────────────────────────────
     def test_colon_format(self):
-        r = self._extract("Nqobile, nqobile@example.com")
-        self.assertEqual(r["email"], "nqobile@example.com")
+        self.assertEqual(self._email("Nqobile, nqobile@example.com"), "nqobile@example.com")
 
 
 class TestCORSMiddleware(unittest.TestCase):
