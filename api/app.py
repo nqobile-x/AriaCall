@@ -10,7 +10,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from api.auth import get_company_id, verify_api_key
 from fastapi.responses import FileResponse, Response, StreamingResponse
@@ -324,54 +324,6 @@ def topics() -> list[dict]:
     except Exception:
         return []
 
-
-@app.post("/whatsapp", include_in_schema=False)
-async def whatsapp_webhook(
-    Body: str = Form(...),
-    From: str = Form(...),
-) -> Response:
-    """Receive Twilio WhatsApp messages and reply via Aria."""
-    import httpx
-
-    account_sid = os.getenv("TWILIO_ACCOUNT_SID")
-    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
-    from_number = os.getenv("TWILIO_WHATSAPP_FROM", "whatsapp:+17372212163")
-
-    # Strip whatsapp: prefix for use as conversation_id
-    conversation_id = From.replace("whatsapp:", "")
-
-    try:
-        result = agent.handle(
-            message=Body.strip(),
-            customer_id=None,
-            conversation_id=conversation_id,
-            company_id="default",
-        )
-        reply_text = result.get("response", "I'm sorry, I couldn't process your message.")
-    except Exception as exc:
-        logger.error("WhatsApp agent error: %s", exc)
-        reply_text = "Sorry, something went wrong on our end. Please try again."
-
-    # Send reply via Twilio REST API
-    if account_sid and auth_token:
-        try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                await client.post(
-                    f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json",
-                    auth=(account_sid, auth_token),
-                    data={
-                        "From": from_number,
-                        "To": From,
-                        "Body": reply_text,
-                    },
-                )
-        except Exception as exc:
-            logger.error("Twilio send error: %s", exc)
-    else:
-        logger.warning("TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN not set — reply not sent")
-
-    # Return empty TwiML (Twilio expects 200)
-    return Response(content="", media_type="text/xml")
 
 
 @app.post("/support", response_model=SupportResponse)

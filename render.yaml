@@ -20,12 +20,7 @@ services:
         sync: false
       - key: GMAIL_REFRESH_TOKEN
         sync: false
-      - key: TWILIO_ACCOUNT_SID
-        sync: false
-      - key: TWILIO_AUTH_TOKEN
-        sync: false
-      - key: TWILIO_WHATSAPP_FROM
-        value: "whatsapp:+17372212163"
+
     disk:
       name: aria-models
       mountPath: /opt/render/project/src/voice
