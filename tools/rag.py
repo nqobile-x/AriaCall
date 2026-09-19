@@ -13,7 +13,7 @@ CHUNK_OVERLAP = 50
 
 
 def _get_client():
-    api_key = os.getenv("PINECONE_API_KEY")
+    api_key = (os.getenv("PINECONE_API_KEY") or "").strip()
     if not api_key:
         return None, None
     try:

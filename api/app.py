@@ -326,6 +326,40 @@ def topics() -> list[dict]:
 
 
 
+@app.post("/support/stream")
+async def support_stream(request: SupportRequest, company: dict = Depends(verify_api_key)) -> StreamingResponse:
+    import asyncio, json as _json
+
+    async def generate():
+        loop = asyncio.get_event_loop()
+        conv_id = request.conversation_id or str(uuid4())
+        try:
+            result = await loop.run_in_executor(None, lambda: agent.handle(
+                message=request.message,
+                customer_id=request.customer_id,
+                conversation_id=conv_id,
+                company_id=company["company_id"],
+            ))
+        except Exception as exc:
+            yield f"data: {_json.dumps({'type': 'error', 'detail': str(exc)})}\n\n"
+            return
+
+        text = result.get("response", "")
+        words = text.split(" ")
+        for i, word in enumerate(words):
+            chunk = word + (" " if i < len(words) - 1 else "")
+            yield f"data: {_json.dumps({'type': 'token', 'text': chunk})}\n\n"
+            await asyncio.sleep(0.035)
+
+        yield f"data: {_json.dumps({'type': 'done', 'conversation_id': conv_id, 'ticket': result.get('ticket'), 'escalated': result.get('escalated', False), 'faq_sources': result.get('faq_sources', []), 'audit_logged': result.get('audit_logged', False), 'learning_suggestion': result.get('learning_suggestion')})}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @app.post("/support", response_model=SupportResponse)
 def support(request: SupportRequest, company: dict = Depends(verify_api_key)) -> SupportResponse:
     try:

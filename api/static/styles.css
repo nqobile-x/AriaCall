@@ -261,6 +261,17 @@ header {
   color: var(--acid);
 }
 .message.user .label { color: var(--coral); }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+.typing-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--acid);
+  vertical-align: text-bottom;
+  margin-left: 2px;
+  animation: blink .7s step-end infinite;
+}
+
 .sources {
   margin: 13px 0 0;
   color: #9797a1;
