@@ -7,20 +7,79 @@ from typing import Any, TypedDict
 
 
 def _extract_contact(message: str) -> dict:
-    """Pull name and email from a user message in any format."""
+    """Pull name and email from a user message in many natural formats."""
     email_match = re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", message)
     email = email_match.group(0).lower() if email_match else None
-    if email and email_match:
-        before = message[: email_match.start()]
-        # Strip trailing labels: "email address :", "email :", "e-mail:", "my email is", ", email"
-        before = re.sub(r"[\s,;]*\b(my\s+)?(e-?mail(\s+address)?|address)(\s+is)?\b[\s:]*$", "", before, flags=re.IGNORECASE)
-        # Strip leading labels: "name :", "name:", "my name is"
-        before = re.sub(r"^[\s]*\b(my\s+)?name\s*[:\-is]*\s*", "", before, flags=re.IGNORECASE)
-        before = before.strip().strip(",.;:")
-        name = before if 2 < len(before) < 60 else None
-    else:
-        name = None
+
+    if not email:
+        return {"name": None, "email": None}
+
+    # Remove the email + surrounding punctuation/labels to get the rest
+    rest = message[: email_match.start()] + " " + message[email_match.end():]
+    rest = re.sub(r"\b(e-?mail(\s+address)?|address)\b", " ", rest, flags=re.IGNORECASE)
+    rest = rest.strip()
+
+    name = _extract_name_from_text(rest)
     return {"name": name, "email": email}
+
+
+_STOP_WORD_RE = r"(?:and|or|but|my|is|am|in|at|on|for|with|the|was|that|this|it|a|an|re|fw)"
+_NAME_WORD = r"[A-Za-z][A-Za-z\-\']*"
+# 1-3 words where each successive word must not be a stop word
+_NAME_PAT = rf"({_NAME_WORD}(?:\s+(?!{_STOP_WORD_RE}\b){_NAME_WORD}){{0,2}})"
+_END = r"(?=\s*[,;.:\-]|\s+\w{{2,}}|\s*$)"
+
+
+def _extract_name_from_text(text: str) -> str | None:
+    """Try multiple patterns to pull a person's name from free text."""
+    # "my name is X" / "name: X" / "name is X"
+    m = re.search(rf"\b(?:my\s+)?name\s*(?:is|:|-|=)?\s*{_NAME_PAT}", text, re.IGNORECASE)
+    if m and _valid_name(m.group(1).strip()):
+        return m.group(1).strip()
+
+    # "I'm X" / "I am X" / "it's X" / "this is X" / "call me X"
+    m = re.search(rf"\b(?:i[''`]?m|i\s+am|it[''`]?s|this\s+is|call\s+me)\s+{_NAME_PAT}", text, re.IGNORECASE)
+    if m and _valid_name(m.group(1).strip()):
+        return m.group(1).strip()
+
+    # "Hi/Hey/Hello, X"
+    m = re.search(rf"^\s*(?:hi|hey|hello|good\s+\w+)[,!\s]+{_NAME_PAT}", text, re.IGNORECASE)
+    if m and _valid_name(m.group(1).strip()):
+        return m.group(1).strip()
+
+    # "X here"
+    m = re.search(rf"({_NAME_WORD}(?:\s+{_NAME_WORD}){{0,2}})\s+here\b", text, re.IGNORECASE)
+    if m and _valid_name(m.group(1).strip()):
+        return m.group(1).strip()
+
+    # Fallback: strip noise, look for title-case sequences
+    stripped = re.sub(
+        r"\b(my|i|was|is|am|the|a|an|and|or|to|for|of|in|it|its|this|that|me|help|please|hi|hey|hello|thanks|thank|you|dear|sir|madam|re|fw|name|email)\b",
+        " ", text, flags=re.IGNORECASE,
+    )
+    stripped = re.sub(r"[^A-Za-z\s\-\']", " ", stripped)
+    stripped = re.sub(r"\s+", " ", stripped).strip()
+    m = re.search(r"\b([A-Z][a-z\-\']{1,20}(?:\s+[A-Z][a-z\-\']{1,20}){0,2})\b", stripped)
+    if m and _valid_name(m.group(1).strip()):
+        return m.group(1).strip()
+
+    return None
+
+
+def _valid_name(candidate: str) -> bool:
+    """Reject single-letter words, stop-word-only strings, and suspicious lengths."""
+    stop = {"hi", "hey", "hello", "my", "me", "i", "am", "is", "it", "the", "and", "or",
+            "to", "for", "a", "an", "please", "thanks", "thank", "you", "dear", "sir",
+            "madam", "help", "good", "morning", "afternoon", "evening", "name", "email",
+            "customer", "there"}
+    words = candidate.strip().split()
+    if not words or len(words) > 4:
+        return False
+    if all(w.lower() in stop for w in words):
+        return False
+    if any(len(w) < 2 for w in words):
+        return False
+    return 2 < len(candidate) < 60
 
 from langgraph.graph import END, START, StateGraph
 
