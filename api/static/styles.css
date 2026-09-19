@@ -327,6 +327,15 @@ textarea {
               box-shadow .2s ease, background .15s ease;
   will-change: transform;
 }
+.send svg, .call-btn svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 
 .send {
   right: 106px; top: 15px;
@@ -334,7 +343,6 @@ textarea {
   border-radius: 50%;
   background: var(--coral);
   color: #171714;
-  font-size: 25px;
 }
 .send:hover   { transform: scale(1.1) rotate(-6deg); box-shadow: 0 6px 20px #ff6d4a40; }
 .send:active  { transform: scale(.9);  box-shadow: none; }
@@ -346,7 +354,7 @@ textarea {
   border-radius: 50%;
   background: #1e2028;
   border-color: #3a3b44;
-  font-size: 18px;
+  color: #d9d9df;
 }
 .call-btn:hover  { transform: scale(1.1); border-color: #5a5b66; }
 .call-btn:active { transform: scale(.9); }
@@ -355,6 +363,24 @@ textarea {
   border-color: var(--coral);
   animation: pulse .9s infinite;
 }
+
+/* Wizard icons are custom line artwork, not platform-dependent emoji. */
+.ob-icon svg, .ob-cap-icon svg {
+  display: block;
+  fill: none;
+  stroke: var(--acid);
+  stroke-width: 1.55;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ob-icon svg { width: 30px; height: 30px; }
+.ob-cap-icon {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  margin-top: 0;
+}
+.ob-cap-icon svg { width: 22px; height: 22px; }
 
 .mic {
   right: 0; top: 15px;
@@ -505,21 +531,30 @@ textarea {
   position: fixed;
   right: 28px;
   bottom: -320px;
-  width: 308px;
+  width: 320px;
   background: #0d0e13;
   border: 1px solid #252738;
   border-radius: 20px 20px 0 0;
-  padding: 18px 22px 26px;
+  padding: 17px 20px 24px;
   z-index: 160;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  transition: bottom 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: bottom 0.55s cubic-bezier(0.34, 1.56, 0.64, 1),
+              width .42s var(--spring-fast), padding .32s var(--spring-fast),
+              border-radius .32s var(--spring-fast);
   box-shadow: 0 -12px 48px #00000080;
   will-change: bottom;
 }
 .call-panel.open { bottom: 0; }
+.call-panel.expanded { width: min(520px, calc(100vw - 56px)); }
+.call-panel.minimized {
+  bottom: 22px;
+  width: 272px;
+  border-radius: 16px;
+  padding: 14px 16px;
+}
 
 .cp-top {
   width: 100%;
@@ -528,6 +563,9 @@ textarea {
   justify-content: space-between;
   margin-bottom: 4px;
 }
+.cp-call-state, .cp-controls { display: flex; align-items: center; }
+.cp-call-state { gap: 8px; }
+.cp-controls { gap: 5px; }
 .cp-tag {
   font: 9px/1 "DM Mono", monospace;
   letter-spacing: .12em;
@@ -541,6 +579,44 @@ textarea {
   box-shadow: 0 0 8px #ff6d4a80;
   animation: pulse .9s infinite;
 }
+.cp-icon-btn {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #858591;
+  background: transparent;
+  cursor: pointer;
+  transition: color .15s ease, background .15s ease, transform .25s var(--spring);
+}
+.cp-icon-btn:hover { color: var(--ink); background: #ffffff0c; transform: translateY(-1px); }
+.cp-icon-btn:active { transform: scale(.9); }
+.cp-icon-btn svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.cp-end-mini { color: #ff8060; }
+.cp-end-mini:hover { color: var(--coral); background: #ff6d4a12; }
+.cp-body {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-height: 230px;
+  overflow: hidden;
+  opacity: 1;
+  transition: max-height .32s var(--spring-fast), opacity .16s ease, margin .32s var(--spring-fast);
+}
+.call-panel.minimized .cp-body { max-height: 0; opacity: 0; margin: 0; pointer-events: none; }
+.call-panel.minimized #cp-minimize svg { transform: rotate(180deg); }
 
 /* greeting burst: wave img pops in with spring scale */
 .cp-wave-wrap {
@@ -548,6 +624,7 @@ textarea {
   display: flex; align-items: center; justify-content: center;
   overflow: hidden;
 }
+.call-panel.expanded .cp-wave-wrap { width: 420px; height: 160px; }
 .cp-wave {
   width: 248px; height: 104px;
   display: block;
@@ -556,6 +633,7 @@ textarea {
   transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1),
               opacity 0.35s ease;
 }
+.call-panel.expanded .cp-wave { width: 400px; height: 155px; }
 .call-panel.open .cp-wave {
   transform: scale(1);
   opacity: 1;
@@ -644,9 +722,15 @@ textarea {
   .conversation { min-height: 470px; padding: 35px 0; }
   .welcome      { padding-left: 30px; }
   .welcome h1   { font-size: 58px; }
-  .composer     { padding-right: 106px; }
+  .composer     { padding-right: 160px; }
   .composer::after { left: -19px; right: -19px; }
-  .send         { right: 54px; }
+  .send         { right: 106px; }
+  .call-btn     { right: 53px; }
+  .call-panel { right: 12px; width: calc(100vw - 24px); }
+  .call-panel.expanded { width: calc(100vw - 24px); }
+  .call-panel.minimized { width: min(272px, calc(100vw - 24px)); bottom: 12px; }
+  .call-panel.expanded .cp-wave-wrap { width: min(420px, 100%); }
+  .call-panel.expanded .cp-wave { width: min(400px, 100%); }
   .voice-note   { white-space: nowrap; font-size: 8px; }
   .welcome > p:last-of-type { font-size: 15px; }
 }

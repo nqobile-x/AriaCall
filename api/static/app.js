@@ -7,6 +7,10 @@ const status = document.querySelector('#status');
 const ticketBanner = document.querySelector('#ticket-banner');
 const callPanel = document.querySelector('#call-panel');
 const cpStatus = document.querySelector('#cp-status');
+const cpMinimize = document.querySelector('#cp-minimize');
+const cpExpand = document.querySelector('#cp-expand');
+const cpEndMini = document.querySelector('#cp-end-mini');
+const cpEndButton = document.querySelector('#cp-end-btn');
 const promptPanes = document.querySelector('#prompt-panes');
 const conversationIdKey = 'aria-conversation-id';
 
@@ -34,7 +38,7 @@ const conversationIdKey = 'aria-conversation-id';
       if (pb) pb.className = 'ob-prog-bar' + (i < n ? ' done' : i === n ? ' active' : '');
     }
     const nextBtn = document.getElementById('ob-next');
-    if (nextBtn) nextBtn.textContent = n === TOTAL ? 'Start chatting →' : 'Next →';
+    if (nextBtn) nextBtn.textContent = n === TOTAL ? 'Start chatting' : 'Next';
   };
 
   window.__obNext = function () {
@@ -97,6 +101,29 @@ function closeCallPanel() {
   callPanel.classList.remove('open');
   callPanel.setAttribute('aria-hidden', 'true');
 }
+
+function setCallPanelMinimized(minimized) {
+  if (!callPanel) return;
+  callPanel.classList.toggle('minimized', minimized);
+  if (minimized) callPanel.classList.remove('expanded');
+  if (cpMinimize) {
+    cpMinimize.setAttribute('aria-label', minimized ? 'Restore call panel' : 'Minimise call panel');
+    cpMinimize.title = minimized ? 'Restore' : 'Minimise';
+  }
+}
+
+function toggleCallPanelExpanded() {
+  if (!callPanel) return;
+  setCallPanelMinimized(false);
+  const expanded = callPanel.classList.toggle('expanded');
+  if (cpExpand) {
+    cpExpand.setAttribute('aria-label', expanded ? 'Restore call panel size' : 'Expand call panel');
+    cpExpand.title = expanded ? 'Restore size' : 'Expand';
+  }
+}
+
+cpMinimize?.addEventListener('click', () => setCallPanelMinimized(!callPanel?.classList.contains('minimized')));
+cpExpand?.addEventListener('click', toggleCallPanelExpanded);
 
 function addMessage(kind, text, sources = []) {
   document.querySelector('.welcome')?.remove();
@@ -211,7 +238,7 @@ function startCall() {
   if (!SR) { alert('Your browser does not support speech recognition. Try Chrome.'); return; }
   inCall = true;
   callBtn.classList.add('in-call');
-  callBtn.textContent = '🔴';
+  callBtn.setAttribute('aria-label', 'End voice call');
   callBtn.title = 'End call';
   setBusy(false, 'CALL ACTIVE — Aria greeting…');
   openCallPanel();
@@ -300,7 +327,7 @@ function endCall() {
   inCall = false;
   callAudioPlaying = false;
   callBtn.classList.remove('in-call');
-  callBtn.textContent = '📞';
+  callBtn.setAttribute('aria-label', 'Start voice call');
   callBtn.title = 'Start voice call';
   recognition?.stop();
   recognition = null;
@@ -310,6 +337,8 @@ function endCall() {
 }
 
 window.__endCall = endCall;
+cpEndButton?.addEventListener('click', endCall);
+cpEndMini?.addEventListener('click', endCall);
 
 callBtn.addEventListener('click', () => { inCall ? endCall() : startCall(); });
 
