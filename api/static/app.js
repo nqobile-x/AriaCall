@@ -222,28 +222,34 @@ async function callSupport(message, retries = 3) {
 }
 
 async function speak(text) {
+  const withTimeout = (promise, ms) =>
+    Promise.race([promise, new Promise(r => setTimeout(r, ms))]);
+
   const sound = await fetch('/voice', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text, engine: selectedVoiceEngine }),
-  });
-  if (sound.ok) {
-    return new Promise(resolve => {
+  }).catch(() => null);
+
+  if (sound?.ok) {
+    return withTimeout(new Promise(resolve => {
       sound.blob().then(blob => {
         const a = new Audio(URL.createObjectURL(blob));
         a.onended = resolve;
-        a.play();
-      });
-    });
-  } else {
-    return new Promise(resolve => {
-      const utt = new SpeechSynthesisUtterance(text);
-      utt.rate = 1.0; utt.pitch = 1.05; utt.lang = 'en-US';
-      utt.onend = resolve;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utt);
-    });
+        a.onerror = resolve;
+        a.play().catch(resolve);
+      }).catch(resolve);
+    }), 12000);
   }
+
+  return withTimeout(new Promise(resolve => {
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.rate = 1.0; utt.pitch = 1.05; utt.lang = 'en-US';
+    utt.onend = resolve;
+    utt.onerror = resolve;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utt);
+  }), 12000);
 }
 
 async function submit(message = textarea.value.trim()) {
