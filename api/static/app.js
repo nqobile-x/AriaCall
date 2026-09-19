@@ -142,6 +142,64 @@ function addMessage(kind, text, sources = []) {
   conversation.scrollTop = conversation.scrollHeight;
 }
 
+function addStreamingMessage() {
+  document.querySelector('.welcome')?.remove();
+  showPromptPanes();
+  const item = document.createElement('article');
+  item.className = 'message aria';
+  item.innerHTML = '<span class="label">ARIA</span><div><span class="typing-cursor"></span></div>';
+  conversation.append(item);
+  conversation.scrollTop = conversation.scrollHeight;
+  return item;
+}
+
+function appendToStreamingMessage(item, token) {
+  const div = item.querySelector('div');
+  const cursor = div.querySelector('.typing-cursor');
+  const text = document.createTextNode(token);
+  div.insertBefore(text, cursor);
+  conversation.scrollTop = conversation.scrollHeight;
+}
+
+function finalizeStreamingMessage(item, sources = []) {
+  item.querySelector('.typing-cursor')?.remove();
+  if (sources.length) {
+    const src = document.createElement('p');
+    src.className = 'sources';
+    src.textContent = `Grounded in: ${sources.map(s => s.title).join(', ')}`;
+    item.append(src);
+  }
+}
+
+async function callSupportStream(message, onToken, onDone) {
+  const response = await fetch('/support/stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': 'aria-demo-key-2024' },
+    body: JSON.stringify({ message, conversation_id: conversationId }),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || 'Unable to reach Aria');
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const parts = buffer.split('\n\n');
+    buffer = parts.pop();
+    for (const part of parts) {
+      if (!part.startsWith('data: ')) continue;
+      const ev = JSON.parse(part.slice(6));
+      if (ev.type === 'token') onToken(ev.text);
+      else if (ev.type === 'done') onDone(ev);
+      else if (ev.type === 'error') throw new Error(ev.detail);
+    }
+  }
+}
+
 async function callSupport(message, retries = 3) {
   for (let attempt = 0; attempt < retries; attempt++) {
     if (attempt > 0) {
@@ -193,18 +251,27 @@ async function submit(message = textarea.value.trim()) {
   textarea.value = ''; textarea.style.height = 'auto';
   addMessage('user', message);
   setBusy(true);
+  const ariaItem = addStreamingMessage();
+  let finalData = null;
   try {
-    const data = await callSupport(message);
-    const spokenReply = data.response.replace(/_Source:.*?_/s, '').trim();
-    addMessage('aria', spokenReply, data.faq_sources);
-    if (data.escalated && data.ticket) {
-      ticketBanner.hidden = false;
-      ticketBanner.innerHTML = `<strong>HUMAN SUPPORT REQUESTED</strong><br>Ticket ${data.ticket.id} is open.`;
-    }
+    await callSupportStream(
+      message,
+      (token) => appendToStreamingMessage(ariaItem, token),
+      (result) => {
+        finalData = result;
+        finalizeStreamingMessage(ariaItem, result.faq_sources);
+        if (result.escalated && result.ticket) {
+          ticketBanner.hidden = false;
+          ticketBanner.innerHTML = `<strong>HUMAN SUPPORT REQUESTED</strong><br>Ticket ${result.ticket.id} is open.`;
+        }
+      },
+    );
+    const spokenReply = (ariaItem.querySelector('div').textContent || '').replace(/_Source:.*?_/s, '').trim();
     await speak(spokenReply);
-    setBusy(false, data.escalated ? 'Support ticket created' : 'Ready to help');
+    setBusy(false, finalData?.escalated ? 'Support ticket created' : 'Ready to help');
   } catch (error) {
-    addMessage('aria', `I'm having trouble connecting right now. ${error.message}`);
+    finalizeStreamingMessage(ariaItem);
+    ariaItem.querySelector('div').textContent = `I'm having trouble connecting right now. ${error.message}`;
     setBusy(false, 'Connection issue');
   }
 }
