@@ -2,6 +2,7 @@ services:
   - type: web
     name: aria-support
     runtime: python
+    autoDeploy: true
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
@@ -11,6 +12,14 @@ services:
         sync: false
       - key: OBSIDIAN_VAULT
         value: obsidian-vault
+      - key: GMAIL_USER
+        sync: false
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_REFRESH_TOKEN
+        sync: false
     disk:
       name: aria-models
       mountPath: /opt/render/project/src/voice

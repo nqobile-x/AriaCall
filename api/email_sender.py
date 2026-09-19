@@ -1,9 +1,29 @@
 from __future__ import annotations
 
+import base64
 import logging
 import os
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
+import httpx
 
 logger = logging.getLogger(__name__)
+
+_TOKEN_URL = "https://oauth2.googleapis.com/token"
+_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
+
+
+def _get_access_token() -> str | None:
+    """Exchange refresh token for a short-lived access token."""
+    resp = httpx.post(_TOKEN_URL, data={
+        "client_id": os.getenv("GMAIL_CLIENT_ID"),
+        "client_secret": os.getenv("GMAIL_CLIENT_SECRET"),
+        "refresh_token": os.getenv("GMAIL_REFRESH_TOKEN"),
+        "grant_type": "refresh_token",
+    }, timeout=10)
+    resp.raise_for_status()
+    return resp.json().get("access_token")
 
 
 def _ticket_html(ticket_id: str, issue: str, customer_name: str, customer_email: str = "") -> str:
@@ -135,30 +155,38 @@ def _ticket_html(ticket_id: str, issue: str, customer_name: str, customer_email:
 
 
 def send_ticket_email(to_email: str, customer_name: str, ticket_id: str, issue: str) -> bool:
-    """Send a ticket confirmation email via Gmail SMTP. Returns True on success."""
+    """Send via Gmail REST API (HTTPS) — works on Render free tier."""
     gmail_user = os.getenv("GMAIL_USER")
-    gmail_pass = os.getenv("GMAIL_APP_PASSWORD")
-    if not gmail_user or not gmail_pass:
-        logger.warning("GMAIL_USER or GMAIL_APP_PASSWORD not set — skipping email")
+    if not all([
+        os.getenv("GMAIL_CLIENT_ID"),
+        os.getenv("GMAIL_CLIENT_SECRET"),
+        os.getenv("GMAIL_REFRESH_TOKEN"),
+        gmail_user,
+    ]):
+        logger.warning("Gmail OAuth env vars not set — skipping email")
         return False
     try:
-        import smtplib
-        from email.mime.multipart import MIMEMultipart
-        from email.mime.text import MIMEText
+        access_token = _get_access_token()
+        if not access_token:
+            logger.error("Failed to obtain Gmail access token")
+            return False
 
         msg = MIMEMultipart("alternative")
         msg["Subject"] = f"Your PulseFlow support ticket #{ticket_id}"
         msg["From"] = f"Aria Support <{gmail_user}>"
         msg["To"] = to_email
-
         msg.attach(MIMEText(_ticket_html(ticket_id, issue, customer_name, to_email), "html"))
 
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(gmail_user, gmail_pass)
-            server.sendmail(gmail_user, to_email, msg.as_string())
-
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+        resp = httpx.post(
+            _SEND_URL,
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={"raw": raw},
+            timeout=15,
+        )
+        resp.raise_for_status()
         logger.info("Ticket email sent to %s (ticket %s)", to_email, ticket_id)
         return True
     except Exception as exc:
-        logger.error("Gmail SMTP exception: %s", exc)
+        logger.error("Gmail API exception: %s", exc)
     return False
