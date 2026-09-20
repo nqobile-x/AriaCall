@@ -326,6 +326,72 @@ def topics() -> list[dict]:
 
 
 
+@app.post("/data/profile")
+async def data_profile(file: UploadFile = File(...)) -> dict:
+    """Upload a CSV/Excel/JSON file and get a data quality profile back."""
+    allowed = {"csv", "xlsx", "xls", "json"}
+    ext = (file.filename or "").rsplit(".", 1)[-1].lower()
+    if ext not in allowed:
+        raise HTTPException(status_code=415, detail=f"Unsupported type .{ext}. Use CSV, XLSX or JSON.")
+    data = await file.read()
+    if len(data) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large — max 10MB.")
+    try:
+        from tools.data_cleaner import parse_upload, profile_dataframe
+        df = parse_upload(data, file.filename)
+        profile = profile_dataframe(df)
+        return {"status": "ok", "file": file.filename, "profile": profile}
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/data/clean")
+async def data_clean(
+    file: UploadFile = File(...),
+    mode: str = "clean",  # "clean" | "script"
+) -> Response:
+    """
+    Clean a CSV/Excel file and return the cleaned file (mode=clean)
+    or a reusable Python script (mode=script).
+    """
+    allowed = {"csv", "xlsx", "xls", "json"}
+    ext = (file.filename or "").rsplit(".", 1)[-1].lower()
+    if ext not in allowed:
+        raise HTTPException(status_code=415, detail=f"Unsupported type .{ext}.")
+    data = await file.read()
+    if len(data) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large — max 10MB.")
+    try:
+        from tools.data_cleaner import clean_dataframe, dataframe_to_bytes, generate_cleaning_script, parse_upload, profile_dataframe
+        df = parse_upload(data, file.filename)
+        profile = profile_dataframe(df)
+
+        if mode == "script":
+            script = generate_cleaning_script(file.filename, profile)
+            return Response(
+                content=script,
+                media_type="text/plain",
+                headers={"Content-Disposition": f"attachment; filename=clean_{file.filename}.py"},
+            )
+
+        cleaned = clean_dataframe(df)
+        out_bytes, media_type = dataframe_to_bytes(cleaned, file.filename)
+        rows_removed = profile["rows"] - len(cleaned)
+        return Response(
+            content=out_bytes,
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f"attachment; filename=cleaned_{file.filename}",
+                "X-Rows-Before": str(profile["rows"]),
+                "X-Rows-After": str(len(cleaned)),
+                "X-Rows-Removed": str(rows_removed),
+                "X-Issues-Found": str(profile["issue_count"]),
+            },
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @app.post("/support/stream")
 async def support_stream(request: SupportRequest, company: dict = Depends(verify_api_key)) -> StreamingResponse:
     import asyncio, json as _json

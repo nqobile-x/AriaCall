@@ -452,6 +452,10 @@
       <div class="nav-item" data-page="quality">
         <span class="nav-icon">◉</span><span>Quality</span>
       </div>
+      <div class="nav-section-label">DATA & CODE</div>
+      <div class="nav-item" data-page="data">
+        <span class="nav-icon">⬡</span><span>Data Cleaner</span>
+      </div>
       <div class="nav-item" data-page="analytics">
         <span class="nav-icon">▦</span><span>Analytics</span>
       </div>
@@ -620,6 +624,45 @@
       </div>
     </div>
 
+    <!-- DATA CLEANER -->
+    <div class="page" id="page-data">
+      <div class="page-header">
+        <h1>Data Cleaner</h1>
+        <p>Upload a CSV or Excel file — Aria profiles it, cleans it, and returns a clean file or reusable script</p>
+      </div>
+
+      <div class="upload-zone" id="data-upload-zone">
+        <div class="uz-icon">⬡</div>
+        <div class="uz-main">Drop your data file here</div>
+        <div class="uz-sub">or <span>click to browse</span> · CSV, XLSX, XLS, JSON · Max 10MB</div>
+        <input type="file" id="data-file-input" accept=".csv,.xlsx,.xls,.json"/>
+      </div>
+
+      <div class="progress-wrap" id="data-progress-wrap">
+        <div class="progress-label" id="data-progress-label">Analysing…</div>
+        <div class="progress-bar"><div class="progress-fill" id="data-progress-fill"></div></div>
+      </div>
+
+      <!-- PROFILE RESULTS -->
+      <div id="data-profile-panel" style="display:none;">
+        <div class="panel" style="margin-bottom:16px;">
+          <div class="panel-head">
+            <h3 id="data-profile-title">Profile</h3>
+            <span class="ph-sub" id="data-profile-sub"></span>
+          </div>
+          <div style="padding:20px 24px;">
+            <div id="data-issues-list" style="margin-bottom:20px;"></div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;">
+              <button class="quick-btn primary" id="data-clean-btn">⬇ Download Cleaned File</button>
+              <button class="quick-btn" id="data-script-btn">{ } Generate Python Script</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="data-msg" style="font-size:13px;color:var(--text2);min-height:20px;margin-bottom:16px;"></div>
+    </div>
+
     <!-- ANALYTICS -->
     <div class="page" id="page-analytics">
       <div class="page-header">
@@ -686,6 +729,7 @@ function switchPage(name) {
   if (name === 'analytics') loadTopics();
   if (name === 'knowledge') loadDocs();
   if (name === 'quality') renderQuality();
+  if (name === 'data') initDataCleaner();
 }
 document.querySelectorAll('.nav-item').forEach(i => i.addEventListener('click', () => switchPage(i.dataset.page)));
 
@@ -822,6 +866,101 @@ async function loadTopics() {
   setTimeout(() => {
     document.querySelectorAll('.topic-bar').forEach(b => b.style.width = b.dataset.w + '%');
   }, 50);
+}
+
+// ── DATA CLEANER ──────────────────────────────────────────────────────────────
+let _dataFile = null;
+let _dataInitDone = false;
+
+function initDataCleaner() {
+  if (_dataInitDone) return;
+  _dataInitDone = true;
+  const zone = document.getElementById('data-upload-zone');
+  const input = document.getElementById('data-file-input');
+  zone.addEventListener('click', () => input.click());
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+  zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag'); handleDataFile(e.dataTransfer.files[0]); });
+  input.addEventListener('change', () => handleDataFile(input.files[0]));
+  document.getElementById('data-clean-btn').addEventListener('click', () => downloadData('clean'));
+  document.getElementById('data-script-btn').addEventListener('click', () => downloadData('script'));
+}
+
+async function handleDataFile(file) {
+  if (!file) return;
+  _dataFile = file;
+  const wrap = document.getElementById('data-progress-wrap');
+  const fill = document.getElementById('data-progress-fill');
+  const label = document.getElementById('data-progress-label');
+  const msg = document.getElementById('data-msg');
+  const panel = document.getElementById('data-profile-panel');
+
+  wrap.style.display = 'block'; fill.style.width = '30%';
+  label.textContent = `Profiling ${file.name}…`;
+  msg.textContent = ''; panel.style.display = 'none';
+
+  try {
+    fill.style.width = '70%';
+    const form = new FormData(); form.append('file', file);
+    const r = await fetch('/data/profile', { method: 'POST', body: form });
+    fill.style.width = '100%';
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || 'Profile failed');
+
+    const p = data.profile;
+    document.getElementById('data-profile-title').textContent = file.name;
+    document.getElementById('data-profile-sub').textContent = `${p.rows} rows · ${p.columns} columns`;
+
+    const issueEl = document.getElementById('data-issues-list');
+    if (!p.issues.length) {
+      issueEl.innerHTML = '<p style="color:var(--green);font-size:13px;">✓ No issues found — this file looks clean already.</p>';
+    } else {
+      issueEl.innerHTML = `
+        <p style="font-size:12px;color:var(--text2);margin-bottom:10px;">${p.issues.length} issue(s) detected:</p>
+        <ul style="padding-left:18px;font-size:13px;color:var(--text2);line-height:1.9;">
+          ${p.issues.map(i => `<li>${i}</li>`).join('')}
+        </ul>`;
+    }
+
+    panel.style.display = 'block';
+    label.textContent = 'Done!';
+    setTimeout(() => { wrap.style.display = 'none'; fill.style.width = '0%'; }, 1500);
+    toast(`${p.issue_count} issue(s) found in ${file.name}`, p.issue_count ? 'err' : 'ok');
+  } catch (err) {
+    fill.style.width = '0%'; wrap.style.display = 'none';
+    msg.textContent = '✗ ' + err.message; msg.style.color = '#f87171';
+    toast(err.message, 'err');
+  }
+}
+
+async function downloadData(mode) {
+  if (!_dataFile) return;
+  const msg = document.getElementById('data-msg');
+  msg.textContent = mode === 'script' ? 'Generating script…' : 'Cleaning file…';
+  msg.style.color = 'var(--text2)';
+  try {
+    const form = new FormData();
+    form.append('file', _dataFile);
+    form.append('mode', mode);
+    const r = await fetch('/data/clean', { method: 'POST', body: form });
+    if (!r.ok) { const d = await r.json(); throw new Error(d.detail); }
+    const blob = await r.blob();
+    const disposition = r.headers.get('Content-Disposition') || '';
+    const nameMatch = disposition.match(/filename=(.+)/);
+    const dlName = nameMatch ? nameMatch[1] : (mode === 'script' ? 'clean_script.py' : 'cleaned_file.csv');
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = dlName; a.click();
+    URL.revokeObjectURL(url);
+    const rowsRemoved = r.headers.get('X-Rows-Removed');
+    msg.textContent = mode === 'script'
+      ? '✓ Script downloaded — run it locally with Python'
+      : `✓ Cleaned file downloaded${rowsRemoved ? ` — ${rowsRemoved} rows removed` : ''}`;
+    msg.style.color = 'var(--green)';
+    toast(mode === 'script' ? 'Script ready' : 'Cleaned file ready', 'ok');
+  } catch (err) {
+    msg.textContent = '✗ ' + err.message; msg.style.color = '#f87171';
+    toast(err.message, 'err');
+  }
 }
 
 // ── QUALITY ───────────────────────────────────────────────────────────────────
