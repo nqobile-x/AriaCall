@@ -10,21 +10,28 @@ _driver = None
 
 
 def _get_driver():
+    """Return the Neo4j driver, or None. Failures are remembered for a while so an offline
+    machine does not pay a connection timeout on every single request."""
     global _driver
+    from tools.resilience import neo4j_breaker, offline_mode
+
     if _driver is not None:
         return _driver
     uri = os.getenv("NEO4J_URI")
     user = os.getenv("NEO4J_USERNAME")
     password = os.getenv("NEO4J_PASSWORD")
-    if not (uri and user and password):
+    if not (uri and user and password) or offline_mode() or not neo4j_breaker.allow():
         return None
     try:
         from neo4j import GraphDatabase
-        _driver = GraphDatabase.driver(uri, auth=(user, password))
-        _driver.verify_connectivity()
+        driver = GraphDatabase.driver(uri, auth=(user, password), connection_timeout=3, max_transaction_retry_time=2)
+        driver.verify_connectivity()
+        _driver = driver
+        neo4j_breaker.record_success()
         logger.info("Neo4j connected: %s", uri)
     except Exception as exc:
-        logger.warning("Neo4j unavailable: %s", exc)
+        logger.warning("Neo4j unavailable, skipping it for a while: %s", type(exc).__name__)
+        neo4j_breaker.record_failure(type(exc).__name__)
         _driver = None
     return _driver
 

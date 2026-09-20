@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import os
+import re
+
+_IMPORT_RE = re.compile(r"^\s*(import|from)\s+\w+", re.M)
 
 
 def run_python(code: str, timeout: int = 30) -> dict:
@@ -12,6 +15,15 @@ def run_python(code: str, timeout: int = 30) -> dict:
     api_key = os.getenv("E2B_API_KEY")
     if api_key:
         return _run_e2b(code, api_key, timeout)
+    if _IMPORT_RE.search(code):
+        return {
+            "stdout": "",
+            "stderr": "",
+            "error": (
+                "This code imports libraries (for example pandas), which need the secure E2B sandbox. "
+                "Set E2B_API_KEY to run it. Aria can still explain and review it."
+            ),
+        }
     return _run_local_safe(code, timeout)
 
 
@@ -20,8 +32,13 @@ def _run_e2b(code: str, api_key: str, timeout: int) -> dict:
         from e2b_code_interpreter import Sandbox  # type: ignore
         with Sandbox(api_key=api_key, timeout=timeout) as sb:
             execution = sb.run_code(code)
-            stdout = "\n".join(str(r) for r in execution.results if r)
-            stderr = "\n".join(execution.error.traceback) if execution.error else ""
+            logs = getattr(execution, "logs", None)
+            printed = "".join(getattr(logs, "stdout", []) or [])
+            shown = "\n".join(str(r) for r in execution.results if r)
+            stdout = "\n".join(part for part in (printed.rstrip("\n"), shown) if part)
+            stderr = "".join(getattr(logs, "stderr", []) or [])
+            if execution.error:
+                stderr = "\n".join(execution.error.traceback) or stderr
             return {"stdout": stdout, "stderr": stderr, "error": execution.error.value if execution.error else None}
     except ImportError:
         return {"stdout": "", "stderr": "", "error": "e2b_code_interpreter package not installed. Run: pip install e2b-code-interpreter"}

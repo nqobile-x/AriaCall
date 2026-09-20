@@ -1,0 +1,41 @@
+id,first_name,last_name,email,phone,age,gender,city,province,signup_date,subscription_plan,monthly_spend,status,last_login
+1,Thabo,Nkosi,thabo.nkosi@gmail.com,+27 82 345 6789,28,Male,Johannesburg,Gauteng,2024-01-15,premium,450.00,active,2025-07-12
+2,siphiwe,dlamini,SIPHIWE.DLAMINI@YAHOO.COM,0731234567,34,male,cape town,western cape,15/01/2024,Basic,320.5,Active,2025-07-10
+3,Nomsa,Zulu,,+27 71 999 0011,27,Female,Durban,KwaZulu-Natal,2024-02-03,Premium,  510.00,active,2025-06-30
+4,RETHABILE,MOKOENA,rethabile.m@outlook.com,082 678 9012,41,F,Pretoria,Gauteng,2024-02-03,premium,510.00,Active,2025-06-30
+5,Lebo,  Sithole ,lebo.sithole@gmail.com,+27834561234,N/A,Male,Johannesburg,GP,2024/03/22,PREMIUM,450,active,07-08-2025
+6,Ayanda,Ngubane,ayanda_ngubane@,0791122334,29,female,Pinetown,KwaZulu Natal,2024-03-22,basic,150.00,inactive,2025-05-01
+7,Marco,De Villiers,marco.dv@gmail.com,+27 82 345 6789,28,Male,Johannesburg,Gauteng,2024-01-15,premium,450.00,active,2025-07-12
+8,Zanele,Khumalo,zanele.k@gmail.com,0826543210,,-,Soweto,Gauteng,2024-04-11,Free,0,Active,NULL
+9,Sipho,Mahlangu,sipho.mahlangu@gmail.com,073-456-7890,55,Male,Midrand,Gauteng,April 11 2024,free,0.00,active,2025-07-01
+10,Fatima,Adams,fatima.adams@webmail.co.za,0214567890,38,Female,Cape Town,Western Cape,2024-05-19,Basic,320.00,active,2025-06-15
+11,Thabo,Nkosi,thabo.nkosi@gmail.com,+27 82 345 6789,28,Male,Johannesburg,Gauteng,2024-01-15,premium,450.00,active,2025-07-12
+12,Kobus,van der Merwe,kobus.vdm@telkom.net,,62,male,bloemfontein,Free State,2024-05-19,Basic,320.00,churned,2025-01-03
+13,Palesa,Mosia,palesa@mosia,0834567123,24,Female,Sandton,Gauteng,2024-06-01,BASIC,320,Active,2025-07-05
+14,N/A,N/A,unknown@unknown.com,0000000000,0,Unknown,Unknown,Unknown,2024-06-01,free,0,inactive,N/A
+15,Bongani,  ,bongani.ndlovu@gmail.com,+27 76 112 3344,31,Male,Durban North,KwaZulu-Natal,2024-06-18,Premium,510.00,Active,2025-07-09
+16,Ingrid,Basson,ingrid.b@gmail.com,082-901-2345,47,Female,George,Western Cape,2024-06-18,premium,510.00,ACTIVE,2025-07-09
+17,Sipho,Mahlangu,sipho.mahlangu@gmail.com,0734567890,55,Male,Midrand,Gauteng,2024-04-11,free,0.00,active,2025-07-01
+18,Thandi,Mthembu,thandi.mthembu@gmail.com,0729988776,abc,Female,East London,Eastern Cape,2024-07-04,Basic,320.00,active,2025-06-20
+19,Riaan,Pretorius,riaan.p@me.com,+27 83 654 3210,39,M,Centurion,gauteng,07/2024/04,Premium,510,active,2025-07-11
+20,Nokuthula,Dube,nokuthula.dube@gmail.com,0851234567,33,Female,Pietermaritzburg,KwaZuluNatal,2024-08-22,basic,320.00,Active,2025-06-28
+21,Amahle,Ntuli,amahle.ntuli@gmail.com,079 765 4321,26,female,Johannesburg,Gauteng,2024-08-22,Basic,320.00,active,28-06-2025
+22,Steven,Koch,steven.koch@gmail.com,,52,Male,Port Elizabeth,Eastern Cape,2024-09-30,Free,N/A,Churned,2024-12-01
+23,Dikeledi,Ramaphosa,dikeledi.r@gmail.com,0641234567,30,Female,Polokwane,Limpopo,2024-09-30,premium,450.00,active,2025-07-06
+24,Khumbu,Sithole,khumbu.s@yahoo.co.za,0831122009,29,male,Johannesburg,Gauteng,30-09-2024,Premium,450.0,active,06-07-2025
+25,Yusuf,Hendricks,yusuf.h@gmail.com,021 876 5432,44,Male,Cape Town,Western Cape,2024-10-10,Basic,320.00,Active,2025-05-30
+26,ZANELE,KHUMALO,zanele.k@gmail.com,0826543210,,-,Soweto,Gauteng,2024-04-11,Free,0,active,
+27,Precious,Vilakazi,precious.vilakazi@gmail.com,+27 60 123 4567,22,Female,Benoni,Gauteng,2024-10-10,free,0.00,active,2025-07-08
+28,Leon,du Plessis,leon.dp@gmail.com,0723344556,58,Male,Stellenbosch,western cape,2024-11-03,Basic,320.00,inactive,2025-03-14
+29,Mpho,Tlou,mpho.tlou@gmail.com,0764433221,27,Female,Rustenburg,North-West,2024-11-03,premium,510,Active,2025-07-10
+30,Nhlanhla,Shabalala,nhlanhla.s@,073 000 1122,35,male,Vereeniging,Gauteng,2024-12-01,Basic,320.00,active,2025-07-02
+31,Celeste,Jordaan,celeste.j@gmail.com,082 234 5678,43,Female,Paarl,Western Cape,2024-12-15,Premium,510.00,active,2025-07-07
+32,Siyanda,Mnguni,siyanda.m@gmail.com,0791234560,28,Male,Tembisa,Gauteng,2024-12-15,premium,450.00,Active,2025-07-07
+33,Thabo,Nkosi,thabo.nkosi@gmail.com,+27 82 345 6789,28,Male,Johannesburg,Gauteng,2024-01-15,premium,450.00,active,2025-07-12
+34,Lindiwe,Ntanzi,lindiwe.ntanzi@gmail.com,0849901234,36,female,Umlazi,KwaZulu-Natal,2025-01-08,Basic,320.00,active,2025-07-03
+35,Gerhard,Swart,gerhard.s@outlook.com,,67,Male,Kimberley,Northern Cape,2025-01-08,Free,0,inactive,2024-11-20
+36,Busisiwe,Majola,busisiwe.m@gmail.com,076 543 2100,25,Female,Alexandra,Gauteng,2025-02-14,PREMIUM,510.00,active,2025-07-11
+37,musa,mthethwa,musa.mthethwa@gmail.com,0836612345,31,male,Richards Bay,KwaZulu Natal,2025-02-14,basic,320,Active,2025-07-04
+38,Cara,Hattingh,cara.h@webmail.co.za,044 987 6543,50,F,Knysna,Western Cape,14/02/2025,Premium,510.00,Active,2025-07-06
+39,Abongile,Tyali,abongile.tyali@gmail.com,0723456789,-1,Female,Mthatha,Eastern Cape,2025-03-01,basic,320.00,active,2025-06-22
+40,Sthembiso,Nxumalo,sthembiso.n@gmail.com,0874321098,29,Male,Germiston,GAUTENG,2025-03-01,Basic,320.00,Active,22/06/2025

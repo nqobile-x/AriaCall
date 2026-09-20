@@ -1,3 +1,27 @@
+// Every request carries an anonymous per-browser id. The server rate-limits per browser (and more loosely per
+// network), so a whole class behind one school IP is not throttled as if it were one person. It is random
+// and holds no personal data.
+(function () {
+  let id = '';
+  try { id = localStorage.getItem('aria-client-id') || ''; } catch (_) { /* private mode */ }
+  if (!id) {
+    id = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now());
+    try { localStorage.setItem('aria-client-id', id); } catch (_) { /* keep in memory for this page */ }
+  }
+  const realFetch = window.fetch.bind(window);
+  window.fetch = (input, init = {}) => {
+    try {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url.startsWith('/') || url.startsWith(location.origin)) {
+        const headers = new Headers(init.headers || (typeof input !== 'string' ? input.headers : undefined));
+        headers.set('X-Client-Id', id);
+        init = { ...init, headers };
+      }
+    } catch (_) { /* never block a request over this */ }
+    return realFetch(input, init);
+  };
+})();
+
 const conversation = document.querySelector('#conversation');
 const textarea = document.querySelector('#message');
 const send = document.querySelector('#send');
@@ -73,9 +97,32 @@ document.querySelectorAll('.vbtn').forEach(btn => {
 
 let conversationId = localStorage.getItem(conversationIdKey) || crypto.randomUUID();
 localStorage.setItem(conversationIdKey, conversationId);
-setInterval(() => fetch('/health').catch(() => {}), 10 * 60 * 1000);
+const LIMITED_TEXT = 'AI limited — built-in mode';
 
-function setBusy(busy, text = busy ? 'Thinking…' : 'Ready to help') {
+async function refreshHealth() {
+  const setLabel = (text, limited, title = '') => {
+    if (limited) status.dataset.limited = text; else delete status.dataset.limited;
+    if (!status.classList.contains('busy')) status.lastChild.textContent = text;
+    status.title = title;
+  };
+  if (navigator.onLine === false) return setLabel('Offline — device has no connection', true, 'Reconnect to use the online features. Lessons and Python practice you have already opened may still work.');
+  try {
+    const health = await (await fetch('/health')).json();
+    if (health.mode === 'offline') return setLabel('Offline mode', true, 'This server is running without internet. Built-in guidance, local AI (if installed), data cleaning and checks still work.');
+    const limited = health.llm_circuit?.status === 'down' || health.llm === 'local fallback';
+    const title = limited ? 'The online AI is unavailable. Built-in guidance' + (health.local_ai ? `, the local AI (${health.local_ai})` : '') + ', data cleaning and checks still work.' : '';
+    setLabel(limited ? (health.local_ai ? 'AI limited — local model' : LIMITED_TEXT) : 'System available', limited, title);
+  } catch (_) {
+    setLabel('Server unreachable', true, 'Cannot reach the Aria server. Check your connection.');
+  }
+}
+refreshHealth();
+setInterval(refreshHealth, 60 * 1000);
+window.addEventListener('online', refreshHealth);
+window.addEventListener('offline', refreshHealth);
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => { /* optional: the app works without it */ });
+
+function setBusy(busy, text = busy ? 'Thinking…' : (status.dataset.limited || 'Ready to help')) {
   status.classList.toggle('busy', busy);
   status.lastChild.textContent = text;
   send.disabled = busy;
@@ -324,8 +371,7 @@ function setMuted(muted) {
   if (cpMuteBtn) {
     cpMuteBtn.title = muted ? 'Unmute' : 'Mute';
     cpMuteBtn.setAttribute('aria-label', muted ? 'Unmute microphone' : 'Mute microphone');
-    cpMuteBtn.style.background = muted ? '#ff6d4a' : 'transparent';
-    cpMuteBtn.style.color = muted ? '#fff' : '#ff6d4a';
+    cpMuteBtn.classList.toggle('is-muted', muted);
   }
   if (muted) {
     recognition?.stop();
@@ -341,7 +387,7 @@ cpMuteBtn?.addEventListener('click', () => setMuted(!callMuted));
 
 function startCall() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { alert('Your browser does not support speech recognition. Try Chrome.'); return; }
+  if (!SR) { showToast('Your browser does not support speech recognition. Try Chrome or Edge.'); return; }
   inCall = true;
   callMuted = false;
   callBtn.classList.add('in-call');
@@ -512,44 +558,45 @@ mic.addEventListener('click', async () => {
 // ── PDF EXPORT ────────────────────────────────────────────────────────────────
 function openExportModal() {
   if (chatHistory.length === 0) {
-    alert('Nothing to export yet — start a conversation first.');
+    showToast('Nothing to export yet — start a conversation first.');
     return;
   }
   const existing = document.getElementById('export-modal');
-  if (existing) { existing.style.display = 'flex'; return; }
+  if (existing) { existing.hidden = false; existing.querySelector('#export-name').focus(); return; }
 
   const modal = document.createElement('div');
   modal.id = 'export-modal';
-  modal.style.cssText = 'position:fixed;inset:0;z-index:999;background:rgba(7,8,12,.82);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:24px;';
+  modal.className = 'modal-backdrop';
   modal.innerHTML = `
-    <div style="background:#13141a;border:1px solid #252738;border-radius:16px;padding:32px;width:100%;max-width:400px;">
-      <h3 style="margin:0 0 8px;font-size:17px;color:#eeeaf4;font-family:'DM Sans',sans-serif;">Export conversation</h3>
-      <p style="margin:0 0 20px;font-size:13px;color:#9898a8;line-height:1.6;">Aria will email you a PDF transcript of this conversation.</p>
-      <label style="display:block;font-size:11px;letter-spacing:.08em;color:#686872;margin-bottom:6px;">YOUR NAME</label>
-      <input id="export-name" type="text" placeholder="e.g. Nqobile" style="width:100%;box-sizing:border-box;background:#0f1018;border:1px solid #252738;border-radius:8px;padding:10px 12px;font-size:14px;color:#eeeaf4;margin-bottom:12px;outline:none;"/>
-      <label style="display:block;font-size:11px;letter-spacing:.08em;color:#686872;margin-bottom:6px;">YOUR EMAIL</label>
-      <input id="export-email" type="email" placeholder="you@example.com" style="width:100%;box-sizing:border-box;background:#0f1018;border:1px solid #252738;border-radius:8px;padding:10px 12px;font-size:14px;color:#eeeaf4;margin-bottom:20px;outline:none;"/>
-      <div style="display:flex;gap:10px;">
-        <button id="export-cancel" style="flex:1;padding:11px;background:transparent;border:1px solid #35363d;border-radius:8px;color:#9898a8;font-size:13px;cursor:pointer;">Cancel</button>
-        <button id="export-send" style="flex:2;padding:11px;background:#ff6d4a;border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">Send PDF →</button>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="export-title">
+      <h3 id="export-title">Export conversation</h3>
+      <p class="note">Aria will email you a PDF transcript of this conversation.</p>
+      <label class="form-label" for="export-name">Your name</label>
+      <input id="export-name" class="field" type="text" placeholder="e.g. Nqobile" autocomplete="name" />
+      <label class="form-label" for="export-email">Your email</label>
+      <input id="export-email" class="field" type="email" placeholder="you@example.com" autocomplete="email" inputmode="email" />
+      <div class="modal-actions">
+        <button id="export-cancel" class="btn btn-ghost" type="button">Cancel</button>
+        <button id="export-send" class="btn btn-primary" type="button">Send PDF →</button>
       </div>
-      <p id="export-status" style="margin:12px 0 0;font-size:12px;text-align:center;color:#9898a8;min-height:18px;"></p>
+      <p id="export-status" class="note" role="status" style="margin-top:12px;text-align:center;min-height:20px"></p>
     </div>`;
-
   document.body.appendChild(modal);
-
-  document.getElementById('export-cancel').addEventListener('click', () => modal.style.display = 'none');
-  modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+  const close = () => { modal.hidden = true; document.getElementById('export-pdf-btn')?.focus(); };
+  document.getElementById('export-cancel').addEventListener('click', close);
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+  modal.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  document.getElementById('export-name').focus();
 
   document.getElementById('export-send').addEventListener('click', async () => {
     const email = document.getElementById('export-email').value.trim();
     const name = document.getElementById('export-name').value.trim() || 'Learner';
     const status = document.getElementById('export-status');
-    if (!email || !email.includes('@')) { status.style.color = '#f87171'; status.textContent = 'Enter a valid email address.'; return; }
+    if (!email || !email.includes('@')) { status.dataset.kind = 'warn'; status.textContent = 'Enter a valid email address.'; return; }
 
     const btn = document.getElementById('export-send');
     btn.disabled = true; btn.textContent = 'Sending…';
-    status.style.color = '#9898a8'; status.textContent = '';
+    status.dataset.kind = ''; status.textContent = '';
 
     try {
       const resp = await fetch('/support/export-pdf', {
@@ -561,13 +608,539 @@ function openExportModal() {
         const err = await resp.json().catch(() => ({}));
         throw new Error(err.detail || 'Failed to send');
       }
-      status.style.color = '#6ee7b7'; status.textContent = `Sent! Check ${email}`;
+      status.dataset.kind = 'info'; status.textContent = `Sent! Check ${email}`;
       btn.textContent = 'Sent ✓';
     } catch (err) {
-      status.style.color = '#f87171'; status.textContent = err.message;
+      status.dataset.kind = 'warn'; status.textContent = err instanceof TypeError ? "Can't reach the Aria server." : err.message;
       btn.disabled = false; btn.textContent = 'Send PDF →';
     }
   });
 }
 
 document.getElementById('export-pdf-btn')?.addEventListener('click', openExportModal);
+
+// ── MODE TABS (Chat / Code / Data / Practice) ────────────────────────────────
+let _codeLang = 'python';
+let _lessonsRequested = false;  // lessons load the first time the Code section opens (not for chat-only visitors)
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function showToast(message, ms = 3800) {
+  document.querySelector('.toast')?.remove();
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.setAttribute('role', 'status');
+  el.textContent = message;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), ms);
+}
+window.showToast = showToast;
+
+function switchMode(mode) {
+  window.Voice?.stop(true);
+  window.Voice?.closePanel();
+  document.querySelectorAll('.mode-tab').forEach(t => {
+    const active = t.dataset.mode === mode;
+    t.classList.toggle('is-active', active);
+    t.setAttribute('aria-selected', String(active));
+    t.tabIndex = active ? 0 : -1;
+  });
+  const isChat = mode === 'chat';
+  const chat = [
+    document.getElementById('conversation'),
+    document.getElementById('ticket-banner'),
+    document.getElementById('prompt-panes'),
+    document.querySelector('.composer'),
+  ];
+  chat.forEach(el => { if (el && el.id !== 'ticket-banner') el.style.display = isChat ? '' : 'none'; });
+  const banner = document.getElementById('ticket-banner');
+  if (banner) banner.style.display = isChat ? '' : 'none';
+  for (const [id, name] of [['panel-code', 'code'], ['panel-data', 'data'], ['panel-practice', 'practice']]) {
+    const panel = document.getElementById(id);
+    if (panel) panel.style.display = mode === name ? 'flex' : 'none';
+  }
+  if (mode === 'practice') window.Practice?.open();
+  if (mode === 'code' && !_lessonsRequested) { _lessonsRequested = true; _loadLessons(_codeLang); }
+}
+window.switchMode = switchMode;
+
+document.querySelectorAll('.mode-tab').forEach(tab => {
+  tab.addEventListener('click', () => switchMode(tab.dataset.mode));
+  tab.addEventListener('keydown', e => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    const tabs = [...document.querySelectorAll('.mode-tab')];
+    const next = tabs[(tabs.indexOf(tab) + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+    next.focus();
+    switchMode(next.dataset.mode);
+  });
+});
+document.querySelectorAll('.mode-tab').forEach(t => { t.tabIndex = t.classList.contains('is-active') ? 0 : -1; });
+
+// ── CODE MODE: mentor (Python / Java / Spring Boot / Data Science) ───────────
+let _codeLevel = 'beginner';
+window.getCodeLevel = () => _codeLevel;
+let _lessons = [];
+let _activeLesson = null;
+let _lastStarter = '';
+let _tutorAbort = null;
+
+function _renderMarkdown(text) {
+  return text.split('```').map((part, i) => {
+    if (i % 2 === 1) {
+      const nl = part.indexOf('\n');
+      const body = (nl >= 0 ? part.slice(nl + 1) : part).replace(/\n$/, '');
+      return `<pre class="pre">${escapeHtml(body)}</pre>`;
+    }
+    return part.split('\n').map(rawLine => {
+      let line = rawLine.replace(/\\([<>_*`])/g, '$1');
+      if (/^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(line) && line.includes('-')) return '';
+      if (/^\s*\|.*\|\s*$/.test(line)) {
+        line = '- ' + line.trim().slice(1, -1).split('|').map(c => c.trim()).filter(Boolean).join(' — ');
+      }
+      if (!line.trim()) return '<div class="md-gap"></div>';
+      if (/^\s*(-{3,}|\*{3,})\s*$/.test(line)) return '<hr class="md-hr">';
+      const h = escapeHtml(line)
+        .replace(/`([^`\n]+)`/g, '<code class="code-inline">$1</code>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/(^|[\s(])\*([^*\s][^*]*?)\*(?=[\s).,;:!?]|$)/g, '$1<em>$2</em>');
+      const heading = h.match(/^#{1,4}\s+(.*)$/);
+      if (heading) return `<div class="result-h">${heading[1]}</div>`;
+      const bullet = h.match(/^\s*[-*]\s+(.*)$/);
+      if (bullet) return `<div class="md-li">• ${bullet[1]}</div>`;
+      return `<div>${h}</div>`;
+    }).join('');
+  }).join('');
+}
+
+function _renderNotice(text) {
+  return `<div class="notice notice-warn">${escapeHtml(text)}</div>`;
+}
+
+function _renderLint(items) {
+  if (!items?.length) return '';
+  const rows = items.map(i => `<div class="lint-row"><span class="sev sev-${escapeHtml(i.severity)}">${escapeHtml(i.severity)}</span><span>${escapeHtml(i.message)}</span></div>`).join('');
+  return `<div class="lint card"><span class="label">Automated checks</span>${rows}</div>`;
+}
+
+async function _streamTutor(body, output, opts = {}) {
+  const listenRoot = opts.listenContainer || output;
+  _tutorAbort?.abort();
+  const controller = new AbortController();
+  _tutorAbort = controller;
+  if (!opts.listenContainer) window.Voice?.addListen(output);
+  window.Voice?.stop(true);
+  if (!opts.listenContainer && output._listenBar) output._listenBar.hidden = true;
+  output.setAttribute('aria-busy', 'true');
+  output.innerHTML = '<p class="empty">Aria is thinking… <span class="typing-cursor"></span></p>';
+  let lintHtml = '';
+  let noticeHtml = '';
+  let text = '';
+  const paint = done => {
+    output.innerHTML = noticeHtml + lintHtml + _renderMarkdown(text) + (done ? '' : '<span class="typing-cursor"></span>');
+    output.scrollTop = output.scrollHeight;
+  };
+  try {
+    const resp = await fetch('/tutor/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': 'aria-demo-key-2024' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!resp.ok) {
+      const e = await resp.json().catch(() => ({}));
+      throw new Error(typeof e.detail === 'string' ? e.detail : 'Request failed');
+    }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split('\n\n');
+      buffer = events.pop();
+      for (const raw of events) {
+        if (!raw.startsWith('data: ')) continue;
+        const evt = JSON.parse(raw.slice(6));
+        if (evt.type === 'lint') { lintHtml = _renderLint(evt.items); paint(false); }
+        else if (evt.type === 'notice') { noticeHtml = _renderNotice(evt.text); paint(false); }
+        else if (evt.type === 'token') { text += evt.text; paint(false); }
+        else if (evt.type === 'error') throw new Error(evt.detail);
+      }
+    }
+    paint(true);
+    window.Voice?.onContentReady(listenRoot, output);
+  } catch (e) {
+    if (e.name === 'AbortError') return;
+    if (e instanceof TypeError) e = new Error("Can't reach the Aria server. Check your connection. Data cleaning, lessons and Python practice may still work offline if you have opened them before.");
+    output.innerHTML = noticeHtml + lintHtml + _renderMarkdown(text) + `<div class="notice notice-bad">${escapeHtml(e.message)}</div>`;
+    window.Voice?.disarm();
+  } finally {
+    output.removeAttribute('aria-busy');
+    if (_tutorAbort === controller) _tutorAbort = null;
+  }
+}
+window._streamTutor = _streamTutor;
+
+function _setActive(buttons, active) {
+  buttons.forEach(b => {
+    const on = b === active;
+    b.classList.toggle('is-active', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+}
+
+async function _loadLessons(language) {
+  const select = document.getElementById('lesson-select');
+  if (!select) return;
+  _lessons = [];
+  _activeLesson = null;
+  select.innerHTML = '<option value="">Free practice</option>';
+  _updateLessonUi();
+  try {
+    const resp = await fetch(`/tutor/lessons?language=${encodeURIComponent(language)}`, { headers: { 'X-API-Key': 'aria-demo-key-2024' } });
+    if (!resp.ok || language !== _codeLang) return;
+    _lessons = await resp.json();
+    _lessons.forEach((lesson, i) => {
+      const opt = document.createElement('option');
+      opt.value = lesson.id;
+      opt.textContent = `${i + 1}. ${lesson.title}`;
+      select.appendChild(opt);
+    });
+  } catch (_) { /* lessons are optional; free practice still works */ }
+}
+
+function _updateLessonUi() {
+  const teach = document.getElementById('lesson-teach-btn');
+  const goal = document.getElementById('lesson-goal');
+  if (teach) teach.disabled = !_activeLesson;
+  if (goal) {
+    goal.hidden = !_activeLesson;
+    goal.textContent = _activeLesson ? `Goal: ${_activeLesson.goal}` : '';
+  }
+}
+
+document.querySelectorAll('.clang-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    _setActive([...document.querySelectorAll('.clang-btn')], btn);
+    _codeLang = btn.dataset.lang;
+    _lessonsRequested = true;
+    const runBtn = document.getElementById('code-run-btn');
+    if (runBtn) runBtn.hidden = !(_codeLang === 'python' || _codeLang === 'datascience');
+    _loadLessons(_codeLang);
+  });
+});
+
+document.querySelectorAll('.clevel-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    _setActive([...document.querySelectorAll('.clevel-btn')], btn);
+    _codeLevel = btn.dataset.level;
+  });
+});
+
+document.getElementById('lesson-select')?.addEventListener('change', e => {
+  _activeLesson = _lessons.find(l => l.id === e.target.value) || null;
+  const input = document.getElementById('code-input');
+  if (_activeLesson && input) {
+    const untouched = !input.value.trim() || input.value === _lastStarter;
+    if (untouched || confirm("Replace the code in the box with this lesson's starter code?")) {
+      input.value = _activeLesson.starter;
+      _lastStarter = _activeLesson.starter;
+    }
+  }
+  _updateLessonUi();
+});
+
+function _runMentor(mode, question = '') {
+  const input = document.getElementById('code-input');
+  const output = document.getElementById('code-output');
+  if (!output) return;
+  const code = input?.value.trim() || '';
+  if (mode !== 'teach' && !code) {
+    showToast('Paste some code first.');
+    input?.focus();
+    return;
+  }
+  _streamTutor({
+    language: _codeLang,
+    level: _codeLevel,
+    mode,
+    code: mode === 'teach' ? '' : code,
+    lesson_id: _activeLesson?.id || null,
+    question: question.slice(0, 480),
+  }, output);
+}
+
+document.getElementById('code-explain-btn')?.addEventListener('click', () => _runMentor('explain'));
+document.getElementById('code-review-btn')?.addEventListener('click', () => _runMentor('review'));
+document.getElementById('lesson-teach-btn')?.addEventListener('click', () => _runMentor('teach'));
+
+// Ask by voice: speak a question about the code (or the chosen lesson); Aria answers and reads it aloud.
+document.getElementById('code-voice-btn')?.addEventListener('click', () => {
+  const button = document.getElementById('code-voice-btn');
+  const status = document.getElementById('code-voice-status');
+  window.Voice?.ask(button, status, question => {
+    const code = document.getElementById('code-input')?.value.trim();
+    if (code) _runMentor('explain', question);
+    else if (_activeLesson) _runMentor('teach', question);
+    else {
+      window.Voice.disarm();
+      status.textContent = 'Paste some code or pick a lesson first, then ask your question.';
+      status.dataset.kind = 'warn';
+      return;
+    }
+    status.textContent = `You asked: “${question}”`;
+    status.dataset.kind = 'info';
+  });
+});
+
+// Keyboard: Ctrl/Cmd+Enter explains; Tab indents (press Esc first to move focus away with Tab).
+(() => {
+  const editor = document.getElementById('code-input');
+  if (!editor) return;
+  let releaseTab = false;
+  editor.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { releaseTab = true; return; }
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); _runMentor('explain'); return; }
+    if (e.key === 'Tab' && !e.shiftKey && !releaseTab) {
+      e.preventDefault();
+      editor.setRangeText('    ', editor.selectionStart, editor.selectionEnd, 'end');
+    } else if (e.key !== 'Tab') {
+      releaseTab = false;
+    }
+  });
+})();
+
+// The mentor's answer gets a listen bar (read aloud with the current sentence highlighted).
+window.Voice?.addListen(document.getElementById('code-output'));
+
+// ── CODE MODE: run (Python only) ──────────────────────────────────────────────
+document.getElementById('code-run-btn')?.addEventListener('click', async () => {
+  const code = document.getElementById('code-input')?.value.trim();
+  const output = document.getElementById('code-output');
+  if (!output) return;
+  if (!code) { showToast('Paste some code first.'); return; }
+  window.Voice?.stop(true);
+  if (output._listenBar) output._listenBar.hidden = true;
+  output.innerHTML = '<p class="empty">Running… <span class="typing-cursor"></span></p>';
+  try {
+    const resp = await fetch('/code/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': 'aria-demo-key-2024' },
+      body: JSON.stringify({ code, language: _codeLang === 'datascience' ? 'datascience' : 'python' }),
+    });
+    if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).detail || 'The code runner is unavailable.');
+    const result = await resp.json();
+    const stdout = (result.stdout || '').trim();
+    const stderr = (result.stderr || '').trim();
+    const error = (result.error || '').trim();
+    let html = '';
+    if (stdout) html += `<span class="label">Output</span><pre class="pre">${escapeHtml(stdout)}</pre>`;
+    if (stderr || error) html += `<span class="label" style="margin-top:12px">Error</span><pre class="pre pre-bad">${escapeHtml(stderr || error)}</pre>`;
+    output.innerHTML = html || '<p class="empty">No output.</p>';
+  } catch (e) {
+    output.innerHTML = `<div class="notice notice-bad">${escapeHtml(e instanceof TypeError ? "Can't reach the Aria server." : e.message)}</div>`;
+  }
+});
+
+// ── DATA MODE: file handling ──────────────────────────────────────────────────
+const _dataDropzone = document.getElementById('data-dropzone');
+const _dataFileInput = document.getElementById('data-file-input');
+const _dataAnalyzeBtn = document.getElementById('data-analyze-btn');
+const _dataFileName = document.getElementById('data-file-name');
+const _DATA_EXT = /\.(csv|xlsx|xls|json)$/i;
+let _dataFile = null;
+let _lastProfile = null;
+
+function _setDataFile(file) {
+  if (file && !_DATA_EXT.test(file.name)) {
+    showToast('Please choose a CSV, Excel (.xlsx/.xls) or JSON file.');
+    return;
+  }
+  _dataFile = file;
+  if (_dataFileName) _dataFileName.textContent = file ? file.name : '';
+  if (_dataAnalyzeBtn) _dataAnalyzeBtn.disabled = !file;
+}
+
+_dataFileInput?.addEventListener('change', () => _setDataFile(_dataFileInput.files[0] || null));
+_dataDropzone?.addEventListener('click', e => { if (e.target !== _dataFileInput) _dataFileInput?.click(); });
+_dataDropzone?.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); _dataFileInput?.click(); } });
+_dataDropzone?.addEventListener('dragover', e => { e.preventDefault(); _dataDropzone.classList.add('is-over'); });
+_dataDropzone?.addEventListener('dragleave', () => _dataDropzone.classList.remove('is-over'));
+_dataDropzone?.addEventListener('drop', e => {
+  e.preventDefault();
+  _dataDropzone.classList.remove('is-over');
+  const file = e.dataTransfer?.files[0];
+  if (file) _setDataFile(file);
+});
+
+function _statCard(label, value) {
+  return `<div class="stat"><span class="label">${label}</span><b>${value ?? '—'}</b></div>`;
+}
+
+_dataAnalyzeBtn?.addEventListener('click', async () => {
+  if (!_dataFile) return;
+  const output = document.getElementById('data-output');
+  if (!output) return;
+  _dataAnalyzeBtn.disabled = true;
+  _dataAnalyzeBtn.textContent = 'Analyzing…';
+  output.innerHTML = '<p class="note">Reading your file… <span class="typing-cursor"></span></p>';
+
+  try {
+    const form = new FormData();
+    form.append('file', _dataFile);
+    const resp = await fetch('/data/profile', { method: 'POST', body: form });
+    if (!resp.ok) {
+      const e = await resp.json().catch(() => ({}));
+      throw new Error(e.detail || 'Analysis failed');
+    }
+    const { profile, file: fname } = await resp.json();
+    _lastProfile = profile;
+    const nullCount = Object.values(profile.null_cols || {}).reduce((a, b) => a + b, 0);
+
+    const colRows = (profile.column_profiles || []).map(col => `
+      <tr>
+        <td class="mono">${escapeHtml(col.name)}</td>
+        <td>${escapeHtml(col.dtype)}</td>
+        <td>${col.null_count > 0 ? `<span class="tag">${col.null_count}</span>` : '<span class="muted">0</span>'}</td>
+        <td>${col.unique_count ?? '—'}</td>
+      </tr>`).join('');
+
+    const issueHtml = profile.issues?.length
+      ? `<div class="stack"><span class="label">Issues found</span>${profile.issues.map(i => `<div class="notice notice-bad">${escapeHtml(i)}</div>`).join('')}</div>`
+      : '<div class="notice notice-good">No issues found — clean dataset.</div>';
+
+    output.innerHTML = `
+      <div class="stack" style="gap:16px">
+        <span class="label" style="margin:0">Profile — ${escapeHtml(fname)}</span>
+        <div class="stats">
+          ${_statCard('Rows', profile.rows)}
+          ${_statCard('Columns', profile.columns)}
+          ${_statCard('Missing', nullCount)}
+          ${_statCard('Duplicates', profile.duplicate_rows)}
+        </div>
+        ${issueHtml}
+        <div class="table-wrap"><table class="table">
+          <thead><tr><th>Column</th><th>Type</th><th>Missing</th><th>Unique</th></tr></thead>
+          <tbody>${colRows}</tbody>
+        </table></div>
+        <div id="data-actions" class="actions">
+          <button type="button" class="btn btn-primary" data-act="clean">Clean &amp; download</button>
+          <button type="button" class="btn btn-secondary" data-act="report">Show what changed</button>
+          <button type="button" class="btn btn-secondary" data-act="script">Download Python script</button>
+          <button type="button" class="btn btn-outline" data-act="analyse">Ask the data scientist</button>
+          <button type="button" class="btn btn-outline" data-act="voice" aria-pressed="false">Ask by voice</button>
+        </div>
+        <p id="data-action-status" class="note" role="status" aria-live="polite"></p>
+        <div id="data-report"></div>
+        <div id="data-mentor" class="output" data-listen hidden></div>
+      </div>`;
+    _wireDataActions(output);
+    window.Voice?.addListen(output.querySelector('#data-mentor'));
+  } catch (e) {
+    output.innerHTML = `<div class="notice notice-bad">${escapeHtml(e instanceof TypeError ? "Can't reach the Aria server. Check your connection." : e.message)}</div>`;
+  } finally {
+    _dataAnalyzeBtn.disabled = false;
+    _dataAnalyzeBtn.textContent = 'Analyze with Aria →';
+  }
+});
+
+// ── DATA MODE: clean / report / script / ask actions ─────────────────────────
+function _downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function _postDataFile(mode) {
+  const form = new FormData();
+  form.append('file', _dataFile);
+  const resp = await fetch(`/data/clean?mode=${mode}`, { method: 'POST', body: form });
+  if (!resp.ok) {
+    const e = await resp.json().catch(() => ({}));
+    throw new Error(e.detail || 'Request failed');
+  }
+  return resp;
+}
+
+function _renderDataReport(report) {
+  const summary = (report.summary || []).map(s =>
+    `<div class="result-row"><b class="mono" style="color:var(--accent)">${s.count}</b> &nbsp;${escapeHtml(s.reason)}<span class="muted"> — ${escapeHtml(s.columns.join(', '))}</span></div>`).join('');
+  const removed = report.duplicates_removed
+    ? `<div class="result-row">${report.duplicates_removed} duplicate record(s) removed (file rows ${report.removed_rows.map(r => r.row).join(', ')}).</div>` : '';
+  const flags = (report.flags || []).map(f => `<div class="notice notice-warn">${escapeHtml(f)}</div>`).join('');
+  const rows = (report.changes || []).slice(0, 150).map(c =>
+    `<tr><td>${c.row}</td><td class="mono">${escapeHtml(c.column)}</td><td style="color:var(--bad)">${escapeHtml(String(c.before ?? ''))}</td><td style="color:var(--good)">${escapeHtml(String(c.after ?? '(blank)'))}</td></tr>`).join('');
+  const more = report.changes_truncated || (report.changes || []).length > 150
+    ? '<p class="note">Showing the first 150 changes. Download the cleaned file for the full result.</p>' : '';
+  return `<div class="stack">
+      <span class="label" style="margin:0">Changes — ${report.rows_before} → ${report.rows_after} rows</span>
+      ${summary}${removed}${flags}
+      <div class="table-wrap" style="max-height:300px"><table class="table">
+        <thead><tr><th>Row</th><th>Column</th><th>Before</th><th>After</th></tr></thead><tbody>${rows}</tbody></table></div>${more}</div>`;
+}
+
+function _wireDataActions(root) {
+  const status = root.querySelector('#data-action-status');
+  const reportBox = root.querySelector('#data-report');
+  const mentorBox = root.querySelector('#data-mentor');
+  const setStatus = (msg, kind = '') => { status.textContent = msg; status.dataset.kind = kind; };
+
+  const analyse = (question = '') => {
+    mentorBox.hidden = false;
+    setStatus('Sending column names and counts only, never row values.', 'info');
+    return _streamTutor({ language: 'datascience', level: _codeLevel, mode: 'analyse', context: _profileContext(_lastProfile), question }, mentorBox);
+  };
+
+  root.querySelectorAll('#data-actions button').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!_dataFile) return;
+      const act = btn.dataset.act;
+      if (act === 'voice') {
+        window.Voice?.ask(btn, status, question => { setStatus(`You asked: “${question}”. Sending column names and counts only, never row values.`, 'info'); analyse(question); });
+        return;
+      }
+      const label = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = 'Working…';
+      setStatus('');
+      try {
+        if (act === 'analyse') { await analyse(); return; }
+        const resp = await _postDataFile(act);
+        if (act === 'report') {
+          reportBox.innerHTML = _renderDataReport(await resp.json());
+        } else if (act === 'script') {
+          _downloadBlob(await resp.blob(), `clean_${_dataFile.name}.py`);
+          setStatus('Script downloaded. Run it with: python clean_script.py your_file', 'info');
+        } else {
+          _downloadBlob(await resp.blob(), `cleaned_${_dataFile.name}`);
+          const before = resp.headers.get('X-Rows-Before');
+          const after = resp.headers.get('X-Rows-After');
+          const changes = resp.headers.get('X-Changes-Made');
+          setStatus(`Cleaned file downloaded — ${before} → ${after} rows, ${changes} values fixed. Use “Show what changed” to review every edit.`, 'info');
+        }
+      } catch (e) {
+        setStatus(e instanceof TypeError ? "Can't reach the Aria server. Check your connection." : e.message, 'warn');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = label;
+      }
+    });
+  });
+}
+
+function _profileContext(profile) {
+  if (!profile) return '';
+  const cols = (profile.column_profiles || [])
+    .map(c => `- ${c.name}: ${c.dtype}, ${c.null_count} missing, ${c.unique_count} distinct`)
+    .join('\n');
+  const issues = (profile.issues || []).map(i => `- ${i}`).join('\n');
+  return `Rows: ${profile.rows}\nColumns: ${profile.columns}\n\nColumns:\n${cols}\n\nDetected quality issues:\n${issues || '- none'}`.slice(0, 4000);
+}

@@ -37,21 +37,35 @@ def account_status_checker(customer: dict | None) -> dict | None:
     return {"customer_id": customer["id"], "status": "active", "plan": customer["plan"], "billing_current": True}
 
 
+_STOPWORDS = frozenset([
+    "and", "the", "for", "with", "you", "your", "our", "can", "any", "all",
+    "not", "are", "was", "this", "that", "its", "how", "what", "who", "use",
+    "from", "has", "have", "will", "may", "also", "then", "been", "into",
+    "but", "get", "set", "way", "new", "per", "via", "they", "their", "them",
+    "could", "would", "should", "does", "did", "more", "also", "just", "very",
+    "over", "out", "some", "when", "which", "here", "there", "where",
+])
+
+
 def faq_search(message: str) -> list[dict]:
     """Retrieve from the Obsidian knowledge base, falling back to starter FAQs.
 
     Scoring: title word-hits are worth 3x body hits, normalised by document
     length so a long catch-all document cannot win on volume alone.
+    Stopwords are excluded from matching to prevent false positives (e.g.
+    a document titled 'GDPR and Privacy Rights' scoring because 'and' appears
+    in an unrelated message).
     """
-    tokens = set(re.findall(r"[a-z]{3,}", message.lower()))
+    raw_tokens = set(re.findall(r"[a-z]{3,}", message.lower()))
+    tokens = raw_tokens - _STOPWORDS
     if not tokens:
         return []
     documents = _knowledge_base_documents() + FAQS
 
     def score(item: dict) -> float:
-        title_tokens = set(re.findall(r"[a-z]{3,}", item["title"].lower()))
+        title_tokens = set(re.findall(r"[a-z]{3,}", item["title"].lower())) - _STOPWORDS
         body_tokens = re.findall(r"[a-z]{3,}", item["text"].lower())
-        body_unique = set(body_tokens)
+        body_unique = set(body_tokens) - _STOPWORDS
         title_hits = len(tokens & title_tokens)
         body_hits = len(tokens & body_unique)
         # Normalise body hits by vocab size to penalise very long catch-all docs.
@@ -59,7 +73,8 @@ def faq_search(message: str) -> list[dict]:
         return title_hits * 3 + body_score
 
     ranked = sorted(documents, key=score, reverse=True)
-    return [item for item in ranked[:3] if score(item) > 0]
+    # Require a meaningful score (>= 1.5) to avoid weak stopword-only matches
+    return [item for item in ranked[:3] if score(item) >= 1.5]
 
 
 def _knowledge_base_documents() -> list[dict]:
@@ -158,6 +173,14 @@ def draft_response(state: dict, use_groq: bool = False) -> str:
             f"A member of our team will reach out to you shortly."
         )
 
+    from tools.resilience import AUTH, classify_error, llm_breaker, offline_mode
+
+    if use_groq and offline_mode():
+        use_groq = False
+    if use_groq and not llm_breaker.allow():
+        logger.warning("LLM circuit open: answering from the knowledge base without the model")
+        use_groq = False
+
     if use_groq:
         try:
             from groq import Groq
@@ -174,12 +197,16 @@ def draft_response(state: dict, use_groq: bool = False) -> str:
                 account_info = f"\nCustomer plan: {account['plan']} | Status: {account['status']}"
 
             system_prompt = (
-                "You are Aria, a warm, sharp, and efficient customer support agent. "
-                "You speak naturally — like a knowledgeable person, not a script. "
-                "Keep replies concise (2-4 sentences). "
-                "Ground every factual claim in the knowledge-base context below. "
-                "Never invent policies, prices, or account-specific data. "
-                "If you genuinely don't know, say a specialist will follow up — don't guess."
+                "You are Aria, a warm, efficient support agent for PulseFlow. "
+                "Speak naturally — concise (2–4 sentences), never robotic. "
+                "Apply these rules in order: "
+                "(1) For PulseFlow product questions (plans, billing, workflows, account features, policies): "
+                "only use facts from the knowledge-base context provided below — never invent policies, prices, or account data. "
+                "(2) For general technical or factual questions (programming languages, frameworks like Spring Boot, tools, "
+                "concepts, definitions, how-tos unrelated to PulseFlow): "
+                "answer accurately from your training knowledge — no KB context needed. "
+                "(3) If you genuinely cannot answer either way, say a specialist will follow up. "
+                "Never leak internal system details."
             )
 
             history = state.get("history") or []
@@ -195,7 +222,7 @@ def draft_response(state: dict, use_groq: bool = False) -> str:
                     ),
                 },
             ]
-            completion = Groq(timeout=20.0).chat.completions.create(
+            completion = Groq(timeout=12.0, max_retries=1).chat.completions.create(
                 model="openai/gpt-oss-20b",
                 temperature=0.3,
                 max_tokens=220,
@@ -203,9 +230,15 @@ def draft_response(state: dict, use_groq: bool = False) -> str:
             )
             content = completion.choices[0].message.content
             if content:
+                llm_breaker.record_success()
                 return content.strip()
+            llm_breaker.record_failure("empty completion")
         except Exception as exc:
             logger.error("Groq call failed: %s: %s", type(exc).__name__, exc)
+            if classify_error(exc) == AUTH:
+                llm_breaker.trip(f"API key rejected: {type(exc).__name__}")
+            else:
+                llm_breaker.record_failure(f"{type(exc).__name__}")
 
     # Fallback: use best FAQ directly
     if faq_sources:

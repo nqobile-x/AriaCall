@@ -27,3 +27,6 @@ voice/*.mp3
 # Editor
 .vscode/
 .idea/
+
+# Self-hosted Python engine for offline installs (scripts/fetch_offline_assets.py)
+api/static/vendor/

@@ -1,9 +1,13 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import asyncio
 import logging
+import json as _json_lib
 import os
+import re
+import threading
 from functools import lru_cache
+from typing import Literal
 
 logger = logging.getLogger(__name__)
 from io import BytesIO
@@ -14,11 +18,12 @@ from uuid import uuid4
 _GROQ_SEMAPHORE = asyncio.Semaphore(10)
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from api.auth import get_company_id, verify_api_key
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
 from agents.support_agent import SupportAgent
@@ -71,7 +76,17 @@ class ExportPdfRequest(BaseModel):
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "llm": "groq" if os.getenv("GROQ_API_KEY") else "local fallback"}
+    from tools.resilience import llm_breaker, offline_mode
+    circuit = llm_breaker.state()
+    llm = "local fallback" if not os.getenv("GROQ_API_KEY") or offline_mode() else "groq" if circuit["status"] != "down" else "groq (unavailable, using built-in fallback)"
+    from tools import local_llm
+    return {
+        "status": "ok",
+        "mode": "offline" if offline_mode() else "online",
+        "llm": llm,
+        "llm_circuit": circuit,
+        "local_ai": local_llm.available_model(),
+    }
 
 
 @app.get("/debug-groq")
@@ -95,6 +110,12 @@ def debug_groq() -> dict:
 @app.get("/", include_in_schema=False)
 def landing() -> FileResponse:
     return FileResponse(static_dir / "landing.html")
+
+
+@app.get("/sw.js", include_in_schema=False)
+def service_worker() -> FileResponse:
+    """Served from the root so it can control the whole app; never cached so updates arrive."""
+    return FileResponse(static_dir / "sw.js", media_type="text/javascript", headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"})
 
 
 @app.get("/chat", include_in_schema=False)
@@ -135,7 +156,10 @@ async def voice(request: VoiceRequest) -> Response:
     groq_key = os.getenv("GROQ_API_KEY")
 
     # Orpheus — Groq neural TTS via streaming httpx (avoids buffering full WAV in RAM)
-    if engine in ("orpheus", "auto") and groq_key:
+    from tools.resilience import offline_mode
+    cloud_ok = not offline_mode()  # OFFLINE_MODE=1 skips the internet voices entirely
+
+    if engine in ("orpheus", "auto") and groq_key and cloud_ok:
         try:
             import httpx
 
@@ -169,11 +193,9 @@ async def voice(request: VoiceRequest) -> Response:
             logger.error("Orpheus TTS returned no audio")
         except Exception as exc:
             logger.error("Orpheus TTS exception: %s", exc)
-        if engine != "auto":
-            raise HTTPException(status_code=503, detail="Orpheus TTS unavailable.")
 
     # Edge TTS — Microsoft AriaNeural (free, no key), stream directly
-    if engine in ("edge", "auto"):
+    if engine in ("orpheus", "edge", "auto") and cloud_ok:
         try:
             import edge_tts
 
@@ -196,11 +218,10 @@ async def voice(request: VoiceRequest) -> Response:
                 return StreamingResponse(_edge_full(), media_type="audio/mpeg")
         except Exception as exc:
             logger.error("Edge TTS exception: %s", exc)
-            if engine != "auto":
-                raise HTTPException(status_code=503, detail="Edge TTS unavailable.")
 
     # Kokoro ONNX — local neural voice
-    if engine in ("kokoro", "auto"):
+    # The local voice is the last resort for every engine, so speech keeps working with no internet.
+    if engine in ("orpheus", "edge", "kokoro", "auto"):
         model_path = Path("voice/models/kokoro-v1.0.onnx")
         voices_path = Path("voice/models/voices-v1.0.bin")
         if model_path.exists() and model_path.stat().st_size >= 100_000_000 and voices_path.exists():
@@ -211,8 +232,7 @@ async def voice(request: VoiceRequest) -> Response:
                 sf.write(buffer, audio, sample_rate, format="WAV")
                 return Response(content=buffer.getvalue(), media_type="audio/wav")
             except Exception:
-                if engine != "auto":
-                    raise HTTPException(status_code=503, detail="Kokoro TTS unavailable.")
+                logger.exception("Kokoro TTS failed")
 
     raise HTTPException(status_code=503, detail="No TTS engine available.")
 
@@ -336,70 +356,101 @@ def topics() -> list[dict]:
 
 
 
+def _json_dumps(obj) -> str:
+    return _json_lib.dumps(obj, ensure_ascii=False, default=str)
+
+
+_DATA_EXTENSIONS = {"csv", "xlsx", "xls", "json"}
+_DATA_MAX_BYTES = 10 * 1024 * 1024
+
+
+async def _read_data_upload(file: UploadFile) -> tuple[bytes, str]:
+    """Validate type and size, and return (bytes, header-safe filename)."""
+    name = file.filename or ""
+    ext = name.rsplit(".", 1)[-1].lower()
+    if ext not in _DATA_EXTENSIONS:
+        raise HTTPException(status_code=415, detail="Unsupported file type. Use CSV, XLSX or JSON.")
+    data = await file.read(_DATA_MAX_BYTES + 1)
+    if len(data) > _DATA_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="File too large — max 10MB.")
+    safe = re.sub(r"[^\w.\-]", "_", Path(name).name)[:100] or f"data.{ext}"
+    return data, safe
+
+
+def _parse_nonempty(parse, data: bytes, name: str):
+    df = parse(data, name)
+    if len(df) == 0:
+        raise ValueError("No data rows found in this file.")
+    return df
+
+
+def _data_error(exc: Exception) -> HTTPException:
+    if isinstance(exc, ValueError):
+        return HTTPException(status_code=422, detail=str(exc))
+    logger.exception("Data processing failed")
+    return HTTPException(status_code=422, detail="Could not read this file. Check it is a valid CSV, Excel or JSON file.")
+
+
 @app.post("/data/profile")
 async def data_profile(file: UploadFile = File(...)) -> dict:
     """Upload a CSV/Excel/JSON file and get a data quality profile back."""
-    allowed = {"csv", "xlsx", "xls", "json"}
-    ext = (file.filename or "").rsplit(".", 1)[-1].lower()
-    if ext not in allowed:
-        raise HTTPException(status_code=415, detail=f"Unsupported type .{ext}. Use CSV, XLSX or JSON.")
-    data = await file.read()
-    if len(data) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="File too large — max 10MB.")
+    data, name = await _read_data_upload(file)
+    from tools.data_cleaner import parse_upload, profile_dataframe
+
+    def work() -> dict:
+        return profile_dataframe(_parse_nonempty(parse_upload, data, name))
+
     try:
-        from tools.data_cleaner import parse_upload, profile_dataframe
-        df = parse_upload(data, file.filename)
-        profile = profile_dataframe(df)
-        return {"status": "ok", "file": file.filename, "profile": profile}
+        return {"status": "ok", "file": name, "profile": await run_in_threadpool(work)}
     except Exception as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise _data_error(exc) from exc
 
 
 @app.post("/data/clean")
 async def data_clean(
     file: UploadFile = File(...),
-    mode: str = "clean",  # "clean" | "script"
+    mode: str = "clean",  # "clean" | "script" | "report"
+    dedupe: bool = True,
 ) -> Response:
     """
-    Clean a CSV/Excel file and return the cleaned file (mode=clean)
-    or a reusable Python script (mode=script).
+    Clean a CSV/Excel file. mode=clean returns the cleaned file, mode=script a standalone
+    Python script, mode=report a JSON list of every change made.
     """
-    allowed = {"csv", "xlsx", "xls", "json"}
-    ext = (file.filename or "").rsplit(".", 1)[-1].lower()
-    if ext not in allowed:
-        raise HTTPException(status_code=415, detail=f"Unsupported type .{ext}.")
-    data = await file.read()
-    if len(data) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=413, detail="File too large — max 10MB.")
+    if mode not in {"clean", "script", "report"}:
+        raise HTTPException(status_code=400, detail="mode must be clean, script or report.")
+    data, name = await _read_data_upload(file)
+    from tools.data_cleaner import clean_with_report, dataframe_to_bytes, generate_cleaning_script, parse_upload
+
+    def work():
+        cleaned, report = clean_with_report(_parse_nonempty(parse_upload, data, name), dedupe=dedupe)
+        if mode == "report":
+            return report, None, None
+        out_bytes, media_type = dataframe_to_bytes(cleaned, name)
+        return report, out_bytes, media_type
+
     try:
-        from tools.data_cleaner import clean_dataframe, dataframe_to_bytes, generate_cleaning_script, parse_upload, profile_dataframe
-        df = parse_upload(data, file.filename)
-        profile = profile_dataframe(df)
-
         if mode == "script":
-            script = generate_cleaning_script(file.filename, profile)
-            return Response(
-                content=script,
-                media_type="text/plain",
-                headers={"Content-Disposition": f"attachment; filename=clean_{file.filename}.py"},
-            )
-
-        cleaned = clean_dataframe(df)
-        out_bytes, media_type = dataframe_to_bytes(cleaned, file.filename)
-        rows_removed = profile["rows"] - len(cleaned)
-        return Response(
-            content=out_bytes,
-            media_type=media_type,
-            headers={
-                "Content-Disposition": f"attachment; filename=cleaned_{file.filename}",
-                "X-Rows-Before": str(profile["rows"]),
-                "X-Rows-After": str(len(cleaned)),
-                "X-Rows-Removed": str(rows_removed),
-                "X-Issues-Found": str(profile["issue_count"]),
-            },
-        )
+            script = await run_in_threadpool(generate_cleaning_script, name)
+            return Response(content=script, media_type="text/plain", headers={"Content-Disposition": f"attachment; filename=clean_{name}.py"})
+        report, out_bytes, media_type = await run_in_threadpool(work)
     except Exception as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise _data_error(exc) from exc
+
+    if mode == "report":
+        return Response(content=_json_dumps(report), media_type="application/json")
+    changes = sum(item["count"] for item in report["summary"])
+    return Response(
+        content=out_bytes,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f"attachment; filename=cleaned_{name}",
+            "X-Rows-Before": str(report["rows_before"]),
+            "X-Rows-After": str(report["rows_after"]),
+            "X-Rows-Removed": str(report["rows_before"] - report["rows_after"]),
+            "X-Changes-Made": str(changes),
+            "X-Issues-Found": str(len(report["summary"]) + len(report["flags"])),
+        },
+    )
 
 
 @app.post("/support/stream")
@@ -455,11 +506,14 @@ async def support_stream(request: SupportRequest, company: dict = Depends(verify
         quality = None
         try:
             from tools.jev_scorer import score_response
-            quality = await score_response(
-                user_message=request.message,
-                aria_response=text,
-                escalated=result.get("escalated", False),
-                has_faq_sources=bool(result.get("faq_sources")),
+            quality = await asyncio.wait_for(
+                score_response(
+                    user_message=request.message,
+                    aria_response=text,
+                    escalated=result.get("escalated", False),
+                    has_faq_sources=bool(result.get("faq_sources")),
+                ),
+                timeout=3.0,  # quality scoring must never hold up the answer
             )
         except Exception as _qe:
             logger.warning("Jev scoring skipped: %s", _qe)
@@ -521,11 +575,163 @@ class CodeRunRequest(BaseModel):
 
 @app.post("/code/run")
 async def run_code(request: CodeRunRequest, company: dict = Depends(verify_api_key)):
-    if request.language.lower() != "python":
+    if request.language.lower() not in {"python", "datascience"}:
         raise HTTPException(status_code=400, detail="Only Python execution is supported.")
     from tools.e2b_runner import run_python
     result = await asyncio.get_event_loop().run_in_executor(None, lambda: run_python(request.code))
     return result
+
+
+# ── CODING MENTOR (Java / Spring Boot / Python) ──────────────────────────────
+_TUTOR_SLOTS = threading.BoundedSemaphore(int(os.getenv("TUTOR_MAX_CONCURRENT", "4")))
+_TUTOR_QUEUE_WAIT = float(os.getenv("TUTOR_QUEUE_WAIT", "0.5"))
+
+from tools.challenges import RateLimiter as _RateLimiter  # noqa: E402
+
+_tutor_limiter = _RateLimiter(limit=30, window=60.0)
+_tutor_ip_limiter = _RateLimiter(limit=360, window=60.0)
+
+
+class TutorRequest(BaseModel):
+    language: Literal["python", "java", "spring", "datascience"]
+    mode: Literal["explain", "review", "teach", "analyse"] = "explain"
+    level: Literal["beginner", "experienced"] = "beginner"
+    code: str = Field(default="", max_length=10_000)
+    lesson_id: str | None = Field(default=None, max_length=40)
+    question: str = Field(default="", max_length=500)
+    context: str = Field(default="", max_length=4000)  # dataset summary only, never raw rows
+
+
+@app.get("/tutor/lessons")
+def tutor_lessons(language: Literal["python", "java", "spring", "datascience"], company: dict = Depends(verify_api_key)) -> list[dict]:
+    from tools.tutor import lessons_for
+    return lessons_for(language)
+
+
+@app.post("/tutor/stream")
+def tutor_stream(request: TutorRequest, http_request: Request, company: dict = Depends(verify_api_key)) -> StreamingResponse:
+    """Stream mentor feedback. Learner code is never logged; identical prompts share a cached answer."""
+    import json as _json
+    from tools.tutor import build_messages, get_lesson, lint_code, offline_for, tutor_events
+
+    _tutor_limiter.limit = int(os.getenv("TUTOR_RATE_LIMIT", "30"))  # requests per browser per minute
+    _tutor_ip_limiter.limit = _tutor_limiter.limit * IP_LIMIT_FACTOR
+    browser_key, ip_key = _client_keys(http_request, company)
+    if not (_tutor_limiter.allow(browser_key) and _tutor_ip_limiter.allow(ip_key)):
+        raise HTTPException(status_code=429, detail="You're asking a lot of questions quickly. Please wait a minute and try again.")
+
+    lesson = get_lesson(request.lesson_id, request.language)
+    if request.lesson_id and not lesson:
+        raise HTTPException(status_code=404, detail="Unknown lesson for this language.")
+    if request.mode in {"explain", "review"} and not request.code.strip():
+        raise HTTPException(status_code=400, detail="Paste some code first.")
+    if request.mode == "teach" and not lesson:
+        raise HTTPException(status_code=400, detail="Pick a lesson to be taught.")
+    if request.mode == "analyse" and (request.language != "datascience" or not request.context.strip()):
+        raise HTTPException(status_code=400, detail="Analyse needs the Data Science track and a dataset summary.")
+
+    findings = lint_code(request.code, request.language) if request.code.strip() else []
+    messages = build_messages(
+        language=request.language, level=request.level, mode=request.mode, code=request.code,
+        lesson=lesson, question=request.question.strip(), findings=findings, context=request.context,
+    )
+    logger.info("tutor request: mode=%s language=%s level=%s chars=%d", request.mode, request.language, request.level, len(request.code))
+
+    def sse(payload: dict) -> str:
+        return f"data: {_json.dumps(payload)}\n\n"
+
+    def offline() -> str:
+        return offline_for(
+            language=request.language, level=request.level, mode=request.mode, code=request.code,
+            lesson=lesson, findings=findings, context=request.context,
+        )
+
+    def generate():
+        if findings:
+            yield sse({"type": "lint", "items": findings})
+        # Model slots are taken inside tutor_events, only when the model is actually called, so cache hits and
+        # learners waiting on an identical in-flight question never queue; a saturated server sheds to built-in guidance.
+        try:
+            for event in tutor_events(messages, offline, slots=_TUTOR_SLOTS, slot_wait=_TUTOR_QUEUE_WAIT):
+                yield sse(event)
+        except Exception:
+            logger.exception("Tutor stream failed unexpectedly")
+            yield sse({"type": "error", "detail": "Something went wrong. Please try again."})
+            return
+        yield sse({"type": "done"})
+
+    return StreamingResponse(generate(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+# ── PRACTICE / INTERVIEW MODE (no LLM, no server-side code execution) ────────
+class ChallengeCheckRequest(BaseModel):
+    id: str = Field(max_length=20)
+    choice: int | None = Field(default=None, ge=0, le=9)
+    code: str = Field(default="", max_length=10_000)
+
+
+class ChallengeSolutionRequest(BaseModel):
+    id: str = Field(max_length=20)
+
+
+IP_LIMIT_FACTOR = 12  # a shared network (a school, a lab) gets this many times one browser's allowance
+
+
+def _client_keys(request: Request, company: dict) -> tuple[str, str]:
+    """(per-browser key, per-network key). Learners on one shared IP are told apart by X-Client-Id."""
+    ip = request.client.host if request.client else "unknown"
+    browser = re.sub(r"[^A-Za-z0-9-]", "", request.headers.get("x-client-id", ""))[:64]
+    owner = company.get("company_id", "anon")
+    return f"{owner}:{browser or ip}", f"{owner}:ip:{ip}"
+
+
+def _rate_limit(request: Request, company: dict) -> None:
+    from tools.challenges import ip_limiter, limiter
+    browser_key, ip_key = _client_keys(request, company)
+    ip_limiter.limit = limiter.limit * IP_LIMIT_FACTOR
+    if not (limiter.allow(browser_key) and ip_limiter.allow(ip_key)):
+        raise HTTPException(status_code=429, detail="Too many requests. Please wait a minute and try again.")
+
+
+def _challenge_or_404(challenge_id: str) -> dict:
+    from tools.challenges import get
+    challenge = get(challenge_id)
+    if not challenge:
+        raise HTTPException(status_code=404, detail="Unknown challenge.")
+    return challenge
+
+
+@app.get("/challenges")
+def list_challenges(request: Request, track: Literal["python", "datascience", "java", "spring"], company: dict = Depends(verify_api_key)) -> list[dict]:
+    """Prompts, starter code and (for Python/data science) tests. Never answers or solutions."""
+    from tools.challenges import list_public
+    _rate_limit(request, company)
+    return list_public(track)
+
+
+@app.post("/challenges/check")
+def check_challenge(body: ChallengeCheckRequest, request: Request, company: dict = Depends(verify_api_key)) -> dict:
+    """Grade a multiple-choice answer or a Java/Spring submission. Static checks only; nothing is executed."""
+    from tools.challenges import grade_mcq, grade_rubric
+    _rate_limit(request, company)
+    challenge = _challenge_or_404(body.id)
+    if challenge["type"] == "code":
+        raise HTTPException(status_code=400, detail="This challenge is graded in your browser.")
+    if challenge["type"] == "mcq":
+        if body.choice is None or body.choice >= len(challenge["options"]):
+            raise HTTPException(status_code=400, detail="Choose one of the options.")
+        return grade_mcq(challenge, body.choice)
+    if not body.code.strip():
+        raise HTTPException(status_code=400, detail="Write some code first.")
+    return grade_rubric(challenge, body.code)
+
+
+@app.post("/challenges/solution")
+def challenge_solution(body: ChallengeSolutionRequest, request: Request, company: dict = Depends(verify_api_key)) -> dict:
+    """Reveal the explanation and reference solution (the client applies a score penalty)."""
+    from tools.challenges import solution_view
+    _rate_limit(request, company)
+    return solution_view(_challenge_or_404(body.id))
 
 
 # ── PHASE 5: CACHE STATS ──────────────────────────────────────────────────────

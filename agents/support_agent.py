@@ -269,16 +269,20 @@ class SupportAgent:
                     "issue": message.strip()[:200],
                     "created_at": ticket.get("created_at", datetime.now(timezone.utc).isoformat()),
                 })
-            # Send confirmation email
+            # Send confirmation email and append status to the response
             email = customer.get("email")
             if email:
                 from api.email_sender import send_ticket_email
-                send_ticket_email(
+                sent = send_ticket_email(
                     to_email=email,
                     customer_name=customer.get("name", "there"),
                     ticket_id=ticket.get("id", "N/A"),
                     issue=message.strip()[:200],
                 )
+                if sent:
+                    result["response"] = result.get("response", "") + f" A confirmation has been sent to **{email}**."
+                else:
+                    result["response"] = result.get("response", "") + " (We couldn't send a confirmation email right now — our team still has your ticket.)"
 
         _history[conversation_id].append({"role": "user", "content": message.strip()})
         _history[conversation_id].append({"role": "assistant", "content": result.get("response", "")})

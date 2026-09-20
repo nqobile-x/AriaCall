@@ -157,6 +157,11 @@ def _ticket_html(ticket_id: str, issue: str, customer_name: str, customer_email:
 
 def send_ticket_email(to_email: str, customer_name: str, ticket_id: str, issue: str) -> bool:
     """Send via Gmail REST API (HTTPS) — works on Render free tier."""
+    from tools.resilience import offline_mode
+
+    if offline_mode():
+        logger.warning("Offline mode: ticket email not sent")
+        return False
     gmail_user = os.getenv("GMAIL_USER")
     if not all([
         os.getenv("GMAIL_CLIENT_ID"),

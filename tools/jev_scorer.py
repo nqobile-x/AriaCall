@@ -20,7 +20,11 @@ async def score_response(
     Returns a dict with score (0-100) and breakdown per criterion.
     Runs silently — never blocks the user-facing response.
     """
+    from tools.resilience import offline_mode
+
     api_key = os.getenv("JEV_API_KEY", "").strip()
+    if offline_mode():
+        return _empty_score("offline mode")
     if not api_key:
         return _empty_score("JEV_API_KEY not configured")
 
