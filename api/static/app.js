@@ -271,6 +271,10 @@ async function submit(message = textarea.value.trim()) {
           ticketBanner.hidden = false;
           ticketBanner.innerHTML = `<strong>HUMAN SUPPORT REQUESTED</strong><br>Ticket ${result.ticket.id} is open.`;
         }
+        // Log quality score to admin panel if available
+        if (result.quality && typeof window.logQuality === 'function') {
+          window.logQuality(message, result.quality);
+        }
       },
     );
     const spokenReply = (ariaItem.querySelector('div').textContent || '').replace(/_Source:.*?_/s, '').trim();

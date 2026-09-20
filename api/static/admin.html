@@ -449,6 +449,9 @@
       <div class="nav-item" data-page="tickets">
         <span class="nav-icon">◎</span><span>Tickets</span>
       </div>
+      <div class="nav-item" data-page="quality">
+        <span class="nav-icon">◉</span><span>Quality</span>
+      </div>
       <div class="nav-item" data-page="analytics">
         <span class="nav-icon">▦</span><span>Analytics</span>
       </div>
@@ -564,6 +567,59 @@
       </div>
     </div>
 
+    <!-- QUALITY -->
+    <div class="page" id="page-quality">
+      <div class="page-header">
+        <h1>Quality Scores</h1>
+        <p>Every Aria response is automatically graded by Jev — flag anything below 75%</p>
+      </div>
+
+      <div class="stats-row" style="grid-template-columns:repeat(3,1fr);">
+        <div class="stat-card accent-green">
+          <div class="s-glow"></div>
+          <div class="s-label">AVG SCORE</div>
+          <div class="s-value" id="q-avg">—</div>
+          <div class="s-sub">Across all graded responses</div>
+        </div>
+        <div class="stat-card accent-coral">
+          <div class="s-glow"></div>
+          <div class="s-label">NEEDS REVIEW</div>
+          <div class="s-value" id="q-review">—</div>
+          <div class="s-sub">Scored below 75%</div>
+        </div>
+        <div class="stat-card">
+          <div class="s-label">GRADED</div>
+          <div class="s-value" id="q-total" style="color:var(--text2);font-size:32px;">—</div>
+          <div class="s-sub">Total responses scored</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Response Log</h3>
+          <span class="ph-sub">Most recent first</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>SCORE</th>
+                <th>MESSAGE</th>
+                <th>ANSWERED</th>
+                <th>TONE</th>
+                <th>ESCALATION</th>
+                <th>CONCISE</th>
+                <th>STATUS</th>
+              </tr>
+            </thead>
+            <tbody id="quality-body">
+              <tr><td colspan="7"><div class="empty"><div class="empty-icon">◉</div>No quality data yet — start a chat to generate scores</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- ANALYTICS -->
     <div class="page" id="page-analytics">
       <div class="page-header">
@@ -629,6 +685,7 @@ function switchPage(name) {
   if (name === 'tickets') loadTickets();
   if (name === 'analytics') loadTopics();
   if (name === 'knowledge') loadDocs();
+  if (name === 'quality') renderQuality();
 }
 document.querySelectorAll('.nav-item').forEach(i => i.addEventListener('click', () => switchPage(i.dataset.page)));
 
@@ -765,6 +822,51 @@ async function loadTopics() {
   setTimeout(() => {
     document.querySelectorAll('.topic-bar').forEach(b => b.style.width = b.dataset.w + '%');
   }, 50);
+}
+
+// ── QUALITY ───────────────────────────────────────────────────────────────────
+const _qualityLog = [];
+
+window.logQuality = function logQuality(userMessage, qualityData) {
+  if (!qualityData || qualityData.score === null) return;
+  _qualityLog.unshift({ message: userMessage, ...qualityData, ts: new Date() });
+}
+
+function renderQuality() {
+  const body = document.getElementById('quality-body');
+  if (!_qualityLog.length) {
+    body.innerHTML = '<tr><td colspan="7"><div class="empty"><div class="empty-icon">◉</div>No quality data yet — start a chat to generate scores</div></td></tr>';
+    document.getElementById('q-avg').textContent = '—';
+    document.getElementById('q-review').textContent = '—';
+    document.getElementById('q-total').textContent = '—';
+    return;
+  }
+  const scores = _qualityLog.map(r => r.score);
+  const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  const needsReview = _qualityLog.filter(r => r.needs_review).length;
+  document.getElementById('q-avg').textContent = avg + '%';
+  document.getElementById('q-avg').style.color = avg >= 75 ? 'var(--green)' : 'var(--coral)';
+  document.getElementById('q-review').textContent = needsReview;
+  document.getElementById('q-total').textContent = _qualityLog.length;
+
+  const tick = v => v === true ? '✓' : v === false ? '✗' : '—';
+  const tickColor = v => v === true ? 'var(--green)' : v === false ? '#f87171' : 'var(--text3)';
+
+  body.innerHTML = _qualityLog.map(r => {
+    const b = r.breakdown || {};
+    const scoreColor = r.score >= 75 ? 'var(--green)' : r.score >= 50 ? '#fbbf24' : '#f87171';
+    return `<tr>
+      <td><span style="font-family:JetBrains Mono,monospace;font-size:13px;font-weight:600;color:${scoreColor}">${r.score}%</span></td>
+      <td><div class="issue-text">${(r.message || '').slice(0, 60)}${(r.message||'').length > 60 ? '…' : ''}</div></td>
+      <td style="color:${tickColor(b.answered_question)};font-size:15px;text-align:center">${tick(b.answered_question)}</td>
+      <td style="color:${tickColor(b.professional_tone)};font-size:15px;text-align:center">${tick(b.professional_tone)}</td>
+      <td style="color:${tickColor(b.correct_escalation)};font-size:15px;text-align:center">${tick(b.correct_escalation)}</td>
+      <td style="color:${tickColor(b.concise_and_clear)};font-size:15px;text-align:center">${tick(b.concise_and_clear)}</td>
+      <td>${r.needs_review
+        ? '<span class="badge badge-doc">REVIEW</span>'
+        : '<span class="badge badge-open">PASS</span>'}</td>
+    </tr>`;
+  }).join('');
 }
 
 // ── TOAST ─────────────────────────────────────────────────────────────────────

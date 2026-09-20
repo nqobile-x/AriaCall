@@ -351,7 +351,20 @@ async def support_stream(request: SupportRequest, company: dict = Depends(verify
             yield f"data: {_json.dumps({'type': 'token', 'text': chunk})}\n\n"
             await asyncio.sleep(0.035)
 
-        yield f"data: {_json.dumps({'type': 'done', 'conversation_id': conv_id, 'ticket': result.get('ticket'), 'escalated': result.get('escalated', False), 'faq_sources': result.get('faq_sources', []), 'audit_logged': result.get('audit_logged', False), 'learning_suggestion': result.get('learning_suggestion')})}\n\n"
+        # Silent quality scoring — never blocks the user
+        quality = None
+        try:
+            from tools.jev_scorer import score_response
+            quality = await score_response(
+                user_message=request.message,
+                aria_response=text,
+                escalated=result.get("escalated", False),
+                has_faq_sources=bool(result.get("faq_sources")),
+            )
+        except Exception as _qe:
+            logger.warning("Jev scoring skipped: %s", _qe)
+
+        yield f"data: {_json.dumps({'type': 'done', 'conversation_id': conv_id, 'ticket': result.get('ticket'), 'escalated': result.get('escalated', False), 'faq_sources': result.get('faq_sources', []), 'audit_logged': result.get('audit_logged', False), 'learning_suggestion': result.get('learning_suggestion'), 'quality': quality})}\n\n"
 
     return StreamingResponse(
         generate(),
