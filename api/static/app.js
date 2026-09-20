@@ -50,7 +50,13 @@ const conversationIdKey = 'aria-conversation-id';
   window.__obDismiss = function () {
     try { localStorage.setItem('aria-onboarded', '1'); } catch (_) {}
     const el = obOverlay();
+    const wasOpen = el && el.style.display !== 'none' && !el.classList.contains('hidden');
     if (el) { el.classList.add('hidden'); el.style.display = 'none'; }
+    // Give the message box focus so typing works straight away (skipped on touch, where it would pop the keyboard).
+    if (wasOpen && window.matchMedia && window.matchMedia('(pointer: fine)').matches) {
+      const box = document.getElementById('message');
+      if (box) box.focus();
+    }
   };
 
   window.__obGoTo = function (n) {
@@ -64,11 +70,21 @@ const conversationIdKey = 'aria-conversation-id';
     }
     const nextBtn = document.getElementById('ob-next');
     if (nextBtn) nextBtn.textContent = n === TOTAL ? 'Start chatting' : 'Next';
+    const overlay = obOverlay();
+    if (overlay) overlay.setAttribute('aria-label', 'Welcome to Aria, step ' + n + ' of ' + TOTAL);
   };
 
   window.__obNext = function () {
     if (step < TOTAL) window.__obGoTo(step + 1); else window.__obDismiss();
   };
+
+  // /chat?guide=1 replays the guide (the landing page links to it).
+  try {
+    if (new URLSearchParams(location.search).has('guide')) {
+      localStorage.removeItem('aria-onboarded');
+      history.replaceState(null, '', location.pathname);
+    }
+  } catch (_) {}
 
   // Hide immediately if already seen
   try {
@@ -80,6 +96,23 @@ const conversationIdKey = 'aria-conversation-id';
   } catch (_) {}
 
   window.__obGoTo(1);
+
+  // Keyboard: focus starts on Next, Tab stays inside the dialog, Esc closes it.
+  const focusables = () => [document.getElementById('ob-skip'), document.getElementById('ob-next')].filter(Boolean);
+  document.addEventListener('keydown', function (e) {
+    const el = obOverlay();
+    if (!el || el.classList.contains('hidden') || el.style.display === 'none') return;
+    if (e.key === 'Escape') { e.preventDefault(); window.__obDismiss(); return; }
+    if (e.key !== 'Tab') return;
+    const items = focusables();
+    if (!items.length) return;
+    const first = items[0], last = items[items.length - 1];
+    if (!el.contains(document.activeElement)) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+    else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+  const startBtn = document.getElementById('ob-next');
+  if (startBtn) startBtn.focus();
 })();
 
 // ── ARIA WAVE AVATAR ─────────────────────────────────────────────────────────

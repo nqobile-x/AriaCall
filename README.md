@@ -1,6 +1,45 @@
-# Aria Support Agent
+<div align="center">
 
-An AI-powered customer-support agent that runs locally and deploys to the cloud. It handles text and voice, retrieves grounded answers from a Markdown knowledge base, escalates edge cases, redacts PII before logging, and keeps a multi-turn conversation memory — all without sending anything to a third-party LLM unless you explicitly add a Groq API key.
+<img src="api/static/aria-mark.svg" width="76" alt="Aria" />
+
+# Aria
+
+**Support that actually listens.**
+
+An AI support agent that answers from your knowledge base, takes live voice calls, hands off to a human when it should,
+cleans messy spreadsheets and teaches code, all in one app.
+
+[**Live demo**](https://aria-support-v2.onrender.com) &nbsp;·&nbsp; [**Watch the 90-second tour**](api/static/media/aria-product-tour.mp4) &nbsp;·&nbsp; [Quick start](#quick-start)
+
+<a href="api/static/media/aria-product-tour.mp4">
+  <img src="docs/images/aria-tour-preview.gif" width="760" alt="Preview of the Aria product tour. Click to watch the full video with Aria's narration." />
+</a>
+
+<sub>Click the preview to watch the full tour with sound. Aria narrates it herself, in her own voice.</sub>
+
+</div>
+
+---
+
+## What Aria does
+
+| | |
+|---|---|
+| **Grounded answers**<br/>Aria answers in seconds and shows exactly which knowledge-base articles she used.<br/><br/><img src="docs/images/chat-grounded-answer.jpg" alt="Aria answering a password-reset question, with the knowledge-base sources shown" /> | **Live voice calls**<br/>Tap the phone for a hands-free call. Aria greets you, listens and replies out loud, with mute and end-call always in reach.<br/><br/><img src="docs/images/voice-call.jpg" alt="The live voice call panel" /> |
+| **Escalates to a human**<br/>When someone is frustrated Aria takes their details, opens an urgent ticket and hands over.<br/><br/><img src="docs/images/escalation-ticket.jpg" alt="A frustrated customer escalated to a human with an urgent ticket" /> | **Admin dashboard**<br/>Your team sees new tickets instantly, alongside the knowledge base, data cleaner, code canvas and analytics.<br/><br/><img src="docs/images/admin-dashboard.jpg" alt="The admin dashboard showing a new ticket" /> |
+| **Data cleaner**<br/>Drop in a CSV, Excel or JSON file. Aria profiles it, finds duplicates, mixed formats and missing values, and cleans it up.<br/><br/><img src="docs/images/data-cleaner.jpg" alt="A data profile listing the issues found in a messy CSV" /> | **Code tutor**<br/>Paste code and Aria explains it in plain English, then gives you something to try. Python, Java, Spring Boot and Data Science.<br/><br/><img src="docs/images/code-tutor.jpg" alt="Aria explaining a Python function" /> |
+| **Practice and interviews**<br/>Challenges are graded against real tests, right in your browser, plus timed mock interviews.<br/><br/><img src="docs/images/practice-tests.jpg" alt="All five tests passing on a practice challenge" /> | **Start anywhere**<br/>A quick first-time guide shows new users around. Replay it any time at `/chat?guide=1`.<br/><br/><img src="docs/images/landing.jpg" alt="The Aria landing page" /> |
+
+### Highlights
+
+- **Chat, voice or both.** Type, tap the mic, or start a live call. Voices: Orpheus (Groq), Microsoft Edge Aria, or the local Kokoro model.
+- **Knowledge-base answers with sources.** Answers come from your own Markdown notes, and Aria says which ones.
+- **Ticketing.** Escalations become tickets your team sees in the admin dashboard.
+- **Data cleaner.** CSV, Excel and JSON profiling and cleanup, with a report of what changed.
+- **Code tutor and practice.** Explain, review and run code; graded challenges and mock interviews.
+- **Export.** Save a conversation as a PDF.
+- **Works with a bad connection.** The app opens and Python practice keeps running offline once loaded.
+- **Private by default.** Personal details are redacted before anything is logged.
 
 ---
 
@@ -193,10 +232,10 @@ Pass `customer_id` in the request, or include their email in the message — Ari
 ## Running tests
 
 ```powershell
-$env:VIRTUAL_ENV="$PWD\venv"; venv\Scripts\python.exe -m unittest tests.test_system -v
+$env:VIRTUAL_ENV="$PWD\venv"; venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py"
 ```
 
-Tests cover: health check, grounded KB retrieval, email-based customer lookup, escalation ticket creation, and invalid input rejection.
+The suite (250+ tests) covers grounded KB retrieval, customer lookup, escalation and tickets, the code tutor and practice challenges, the data cleaner, offline mode, load protection and the UI contract.
 
 ---
 

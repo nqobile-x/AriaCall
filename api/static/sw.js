@@ -4,7 +4,8 @@
 // - Read-only lists (challenges, lessons): network-first with cache fallback.
 // - The Python engine (Pyodide, from the CDN or /static/vendor): cache-first, it never changes.
 // - POST requests (chat, tutor, grading) are never cached or answered here.
-const VERSION = 'aria-v4';
+// - Media (/static/media) and any range request bypass the worker so the tour video streams normally.
+const VERSION = 'aria-v5';
 const SHELL = [
   '/chat', '/static/styles.css', '/static/app.js', '/static/voice.js', '/static/practice.js', '/static/challenge_harness.py',
   '/static/aria-wave.svg', '/static/aria-mark.svg', '/static/aria-call.svg',
@@ -78,7 +79,10 @@ async function networkFirst(request) {
 self.addEventListener('fetch', event => {
   const request = event.request;
   if (request.method !== 'GET') return;
+  // Video and other range requests go straight to the network: partial (206) responses cannot be cached.
+  if (request.headers.has('range')) return;
   const url = new URL(request.url);
+  if (url.origin === self.location.origin && url.pathname.startsWith('/static/media/')) return;
   const sameOrigin = url.origin === self.location.origin;
   if (isPyodide(url) || isFont(url)) {
     event.respondWith(cacheFirst(request));

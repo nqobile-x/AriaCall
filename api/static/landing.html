@@ -137,6 +137,41 @@
     border: none; border-top: 1px solid var(--line); margin: 0 40px;
   }
 
+
+  /* TOUR VIDEO */
+  .tour { max-width: 1100px; margin: 0 auto; padding: 100px 40px; scroll-margin-top: 40px; }
+  .tour h2 {
+    font: 400 clamp(38px, 5.6vw, 64px)/.98 'Instrument Serif', Georgia, serif;
+    letter-spacing: -.03em; margin-bottom: 18px; max-width: 760px;
+  }
+  .tour h2 em { font-style: italic; color: var(--coral); }
+  .tour-sub { color: var(--dim); font-size: 17px; max-width: 560px; margin-bottom: 40px; }
+  .tour-frame {
+    position: relative; aspect-ratio: 16 / 9; background: #000; overflow: hidden;
+    border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: 0 30px 90px rgba(0,0,0,.5), 0 0 120px rgba(255,109,74,.10);
+  }
+  .tour-frame video { display: block; width: 100%; height: 100%; object-fit: cover; background: #000; }
+  .tour-play {
+    position: absolute; inset: 0; display: grid; place-items: center; border: 0; padding: 0;
+    background: linear-gradient(180deg, rgba(16,17,20,.05), rgba(16,17,20,.45)); cursor: pointer;
+    transition: opacity .25s;
+  }
+  .tour-play .disc {
+    width: 92px; height: 92px; border-radius: 50%; background: var(--coral); display: grid; place-items: center;
+    box-shadow: 0 10px 40px rgba(255,109,74,.45); transition: transform .15s;
+  }
+  .tour-play:hover .disc, .tour-play:focus-visible .disc { transform: scale(1.06); }
+  .tour-play:focus-visible { outline: 3px solid var(--acid); outline-offset: -6px; }
+  .tour-play svg { width: 34px; height: 34px; margin-left: 5px; fill: #fff; }
+  .tour-play .len {
+    position: absolute; right: 20px; top: 18px; font: 11px/1 'DM Mono', monospace; letter-spacing: .1em;
+    color: var(--ink); background: rgba(16,17,20,.72); padding: 8px 12px; border-radius: 999px;
+  }
+  .tour-frame.playing .tour-play { opacity: 0; pointer-events: none; }
+  .tour-note { margin-top: 16px; font: 11px/1.6 'DM Mono', monospace; letter-spacing: .06em; color: var(--dim); }
+  .tour-note a { color: var(--acid); }
+
   /* HOW IT WORKS */
   .how {
     max-width: 1100px; margin: 0 auto; padding: 100px 40px;
@@ -257,7 +292,8 @@
     nav { padding: 18px 20px; }
     .nav-links { display: none; }
     .hero { padding: 100px 20px 60px; }
-    .how, .caps, .topics, .cta-band { padding-left: 20px; padding-right: 20px; }
+    .how, .caps, .topics, .cta-band, .tour { padding-left: 20px; padding-right: 20px; }
+    .tour-play .disc { width: 68px; height: 68px; }
     .steps, .caps-grid { grid-template-columns: 1fr; }
     .topics { grid-template-columns: 1fr; gap: 40px; }
     footer { flex-direction: column; gap: 16px; padding: 28px 20px; }
@@ -274,6 +310,7 @@
     <span class="ver">v2</span>
   </div>
   <div class="nav-links">
+    <a href="#tour">Watch the tour</a>
     <a href="#how">How it works</a>
     <a href="#capabilities">Capabilities</a>
     <a href="/admin">Admin</a>
@@ -290,6 +327,7 @@
   </p>
   <div class="hero-actions">
     <a href="/chat" class="btn-primary">Start a conversation</a>
+    <a href="#tour" class="btn-secondary">&#9654; Watch the tour</a>
     <a href="#how" class="btn-secondary">See how it works</a>
   </div>
   <div class="hero-stat-row">
@@ -306,6 +344,26 @@
       <div class="lbl">ESCALATION PATH</div>
     </div>
   </div>
+</section>
+
+<hr class="section-divider"/>
+
+<!-- TOUR VIDEO -->
+<section class="tour" id="tour">
+  <p class="section-label">PRODUCT TOUR</p>
+  <h2>Let Aria show you <em>around.</em></h2>
+  <p class="tour-sub">A 90-second walkthrough of the real app, narrated by Aria herself: grounded answers, live voice calls, human hand-off, the admin dashboard, data cleaning and the code tutor.</p>
+  <div class="tour-frame" id="tour-frame">
+    <video id="tour-video" controls preload="none" playsinline poster="/static/media/aria-product-tour-poster.jpg">
+      <source src="/static/media/aria-product-tour.mp4" type="video/mp4"/>
+      Your browser can't play this video. <a href="/static/media/aria-product-tour.mp4">Download the tour</a> instead.
+    </video>
+    <button class="tour-play" id="tour-play" type="button" aria-label="Play the Aria product tour with sound">
+      <span class="disc"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L7.5 3.64A1 1 0 0 0 6 4.5Z"/></svg></span>
+      <span class="len">WATCH · 1:30 · WITH SOUND</span>
+    </button>
+  </div>
+  <p class="tour-note">Captions are built in. Prefer to try it yourself? <a href="/chat">Start a conversation</a> or <a href="/chat?guide=1">replay the quick guide</a>.</p>
 </section>
 
 <hr class="section-divider"/>
@@ -435,6 +493,16 @@
 <script>
   const nav = document.getElementById('nav');
   window.addEventListener('scroll', () => nav.classList.toggle('scrolled', scrollY > 40), { passive: true });
+</script>
+
+<script>
+  (function () {
+    var frame = document.getElementById('tour-frame'), video = document.getElementById('tour-video'), btn = document.getElementById('tour-play');
+    if (!frame || !video || !btn) return;
+    btn.addEventListener('click', function () { video.play().catch(function () {}); video.focus(); });
+    video.addEventListener('play', function () { frame.classList.add('playing'); });
+    video.addEventListener('ended', function () { frame.classList.remove('playing'); });
+  })();
 </script>
 </body>
 </html>
