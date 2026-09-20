@@ -4,6 +4,11 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Aria Admin</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/java.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/bash.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
@@ -393,6 +398,80 @@
   #toast.err { border-color: rgba(248,113,113,.3); }
   #toast.err::before { content: '✗'; color: #f87171; font-weight: 700; }
 
+  /* ── CODE CANVAS ── */
+  .canvas-shell {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    height: calc(100vh - 160px);
+    min-height: 500px;
+  }
+  .canvas-pane {
+    display: flex; flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .canvas-pane-head {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .canvas-pane-head h4 { font-size: 11px; font-family: 'JetBrains Mono', monospace; letter-spacing: .1em; color: var(--text3); }
+  .canvas-pane-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .canvas-lang-row { display: flex; gap: 8px; flex-shrink: 0; }
+  .lang-btn {
+    padding: 5px 12px; border-radius: 6px; font-size: 11px;
+    font-family: 'JetBrains Mono', monospace; cursor: pointer;
+    border: 1px solid var(--border2); background: var(--surface2);
+    color: var(--text2); transition: all .15s;
+  }
+  .lang-btn.active { background: var(--coral); color: #fff; border-color: var(--coral); }
+  .canvas-input-wrap { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+  .canvas-textarea {
+    width: 100%; background: var(--bg); border: 1px solid var(--border2);
+    color: var(--text); padding: 12px 14px; border-radius: 8px;
+    font-size: 13px; font-family: 'JetBrains Mono', monospace;
+    resize: vertical; min-height: 100px; outline: none;
+    transition: border-color .2s;
+  }
+  .canvas-textarea:focus { border-color: var(--coral); }
+  .canvas-textarea::placeholder { color: var(--text3); }
+  .canvas-submit {
+    background: var(--coral); color: #fff; border: none;
+    padding: 10px 20px; border-radius: 8px; font-size: 13px;
+    font-weight: 600; cursor: pointer; align-self: flex-end;
+    transition: opacity .15s;
+  }
+  .canvas-submit:hover { opacity: .9; }
+  .canvas-submit:disabled { opacity: .4; cursor: not-allowed; }
+  .canvas-msg { font-size: 12px; color: var(--text2); padding: 10px 14px; background: var(--surface2); border-radius: 6px; line-height: 1.6; }
+  .canvas-msg.user { color: var(--text); border-left: 2px solid var(--coral); }
+  .canvas-msg.aria { border-left: 2px solid var(--green); }
+
+  /* code blocks in canvas */
+  .canvas-code-block {
+    position: relative; border-radius: 8px; overflow: hidden;
+    margin: 4px 0;
+  }
+  .canvas-code-block .lang-label {
+    position: absolute; top: 8px; right: 40px;
+    font-size: 10px; font-family: 'JetBrains Mono', monospace;
+    color: var(--text3); letter-spacing: .08em;
+  }
+  .canvas-code-block .copy-btn {
+    position: absolute; top: 6px; right: 8px;
+    background: var(--surface2); border: 1px solid var(--border2);
+    color: var(--text2); padding: 3px 8px; border-radius: 4px;
+    font-size: 10px; cursor: pointer; transition: all .15s;
+  }
+  .canvas-code-block .copy-btn:hover { border-color: var(--coral); color: var(--coral); }
+  .canvas-code-block pre { margin: 0; }
+  .canvas-code-block code { font-size: 12px !important; font-family: 'JetBrains Mono', monospace !important; }
+  .hljs { background: #0d0e14 !important; padding: 32px 14px 14px !important; }
+
   @media (max-width: 900px) {
     :root { --sidebar-w: 64px; }
     .nav-item span, .sidebar-top .company-row, .brand-text, .brand-badge, .sidebar-footer { display: none; }
@@ -456,6 +535,10 @@
       <div class="nav-item" data-page="data">
         <span class="nav-icon">⬡</span><span>Data Cleaner</span>
       </div>
+      <div class="nav-item" data-page="code">
+        <span class="nav-icon">{ }</span><span>Code Canvas</span>
+      </div>
+      <div class="nav-section-label">ANALYTICS</div>
       <div class="nav-item" data-page="analytics">
         <span class="nav-icon">▦</span><span>Analytics</span>
       </div>
@@ -663,6 +746,50 @@
       <div id="data-msg" style="font-size:13px;color:var(--text2);min-height:20px;margin-bottom:16px;"></div>
     </div>
 
+    <!-- CODE CANVAS -->
+    <div class="page" id="page-code">
+      <div class="page-header">
+        <h1>Code Canvas</h1>
+        <p>Paste an error or code question — Aria explains and fixes it with syntax highlighting</p>
+      </div>
+
+      <div class="canvas-shell">
+        <!-- LEFT: INPUT PANE -->
+        <div class="canvas-pane">
+          <div class="canvas-pane-head">
+            <h4>INPUT</h4>
+            <div class="canvas-lang-row">
+              <button class="lang-btn active" data-lang="java">Java</button>
+              <button class="lang-btn" data-lang="python">Python</button>
+              <button class="lang-btn" data-lang="general">General</button>
+            </div>
+          </div>
+          <div class="canvas-pane-body">
+            <div class="canvas-input-wrap">
+              <textarea class="canvas-textarea" id="canvas-input"
+                placeholder="Paste your error message or code question here…&#10;&#10;e.g. NullPointerException at UserService.java:42&#10;or: Why is my pandas merge returning NaN?"></textarea>
+              <button class="canvas-submit" id="canvas-submit">Ask Aria →</button>
+            </div>
+            <div id="canvas-history"></div>
+          </div>
+        </div>
+
+        <!-- RIGHT: CODE OUTPUT PANE -->
+        <div class="canvas-pane">
+          <div class="canvas-pane-head">
+            <h4>CODE OUTPUT</h4>
+            <span id="canvas-status" style="font-size:11px;color:var(--text3);">Waiting for input…</span>
+          </div>
+          <div class="canvas-pane-body" id="canvas-output">
+            <div class="empty" style="margin:auto;">
+              <div class="empty-icon">{ }</div>
+              Code and explanations appear here
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ANALYTICS -->
     <div class="page" id="page-analytics">
       <div class="page-header">
@@ -730,6 +857,7 @@ function switchPage(name) {
   if (name === 'knowledge') loadDocs();
   if (name === 'quality') renderQuality();
   if (name === 'data') initDataCleaner();
+  if (name === 'code') initCodeCanvas();
 }
 document.querySelectorAll('.nav-item').forEach(i => i.addEventListener('click', () => switchPage(i.dataset.page)));
 
@@ -866,6 +994,141 @@ async function loadTopics() {
   setTimeout(() => {
     document.querySelectorAll('.topic-bar').forEach(b => b.style.width = b.dataset.w + '%');
   }, 50);
+}
+
+// ── CODE CANVAS ───────────────────────────────────────────────────────────────
+let _canvasLang = 'java';
+let _canvasInit = false;
+let _canvasConvId = null;
+
+function initCodeCanvas() {
+  if (_canvasInit) return;
+  _canvasInit = true;
+
+  // Language buttons
+  document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _canvasLang = btn.dataset.lang;
+    });
+  });
+
+  // Submit
+  document.getElementById('canvas-submit').addEventListener('click', canvasAsk);
+  document.getElementById('canvas-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.ctrlKey) canvasAsk();
+  });
+}
+
+function renderMarkdownCode(text) {
+  // Split text into prose and code blocks, render each appropriately
+  const parts = text.split(/(```[\w]*\n[\s\S]*?```)/g);
+  return parts.map(part => {
+    const codeMatch = part.match(/^```([\w]*)\n([\s\S]*?)```$/);
+    if (codeMatch) {
+      const lang = codeMatch[1] || _canvasLang || 'plaintext';
+      const code = codeMatch[2];
+      const id = 'cb-' + Math.random().toString(36).slice(2, 8);
+      const highlighted = (typeof hljs !== 'undefined')
+        ? hljs.highlight(code, { language: lang, ignoreIllegals: true }).value
+        : code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return `<div class="canvas-code-block">
+        <span class="lang-label">${lang.toUpperCase()}</span>
+        <button class="copy-btn" onclick="copyCode('${id}')">Copy</button>
+        <pre><code id="${id}" class="hljs language-${lang}">${highlighted}</code></pre>
+      </div>`;
+    }
+    // Prose — escape HTML, preserve line breaks
+    const escaped = part.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return escaped ? `<p style="font-size:13px;color:var(--text2);line-height:1.7;white-space:pre-wrap;">${escaped}</p>` : '';
+  }).join('');
+}
+
+function copyCode(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent).then(() => toast('Copied!', 'ok'));
+}
+
+async function canvasAsk() {
+  const input = document.getElementById('canvas-input');
+  const msg = input.value.trim();
+  if (!msg) return;
+
+  const langPrefix = _canvasLang !== 'general'
+    ? `[${_canvasLang.toUpperCase()} question] `
+    : '';
+  const fullMsg = langPrefix + msg;
+
+  // Show user message in history
+  const history = document.getElementById('canvas-history');
+  const userEl = document.createElement('div');
+  userEl.className = 'canvas-msg user';
+  userEl.textContent = msg;
+  history.appendChild(userEl);
+
+  // Set output pane to streaming state
+  const output = document.getElementById('canvas-output');
+  const statusEl = document.getElementById('canvas-status');
+  output.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:8px;">Aria is thinking…</div>';
+  statusEl.textContent = 'Generating…';
+
+  const submitBtn = document.getElementById('canvas-submit');
+  submitBtn.disabled = true;
+  input.value = '';
+
+  let fullResponse = '';
+
+  try {
+    if (!_canvasConvId) _canvasConvId = crypto.randomUUID();
+
+    const response = await fetch('/support/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+      body: JSON.stringify({ message: fullMsg, conversation_id: _canvasConvId }),
+    });
+
+    if (!response.ok) throw new Error('Aria unavailable');
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    output.innerHTML = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop();
+      for (const part of parts) {
+        if (!part.startsWith('data: ')) continue;
+        const ev = JSON.parse(part.slice(6));
+        if (ev.type === 'token') {
+          fullResponse += ev.text;
+          output.innerHTML = renderMarkdownCode(fullResponse);
+          output.scrollTop = output.scrollHeight;
+        } else if (ev.type === 'done') {
+          statusEl.textContent = 'Done';
+        }
+      }
+    }
+
+    // Add Aria response to history
+    const ariaEl = document.createElement('div');
+    ariaEl.className = 'canvas-msg aria';
+    ariaEl.textContent = fullResponse.replace(/```[\s\S]*?```/g, '[code block]').slice(0, 120) + '…';
+    history.appendChild(ariaEl);
+    history.scrollTop = history.scrollHeight;
+
+  } catch (err) {
+    output.innerHTML = `<div class="canvas-msg" style="color:#f87171;">✗ ${err.message}</div>`;
+    statusEl.textContent = 'Error';
+    toast(err.message, 'err');
+  } finally {
+    submitBtn.disabled = false;
+  }
 }
 
 // ── DATA CLEANER ──────────────────────────────────────────────────────────────

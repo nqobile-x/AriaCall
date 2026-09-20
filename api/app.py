@@ -59,6 +59,12 @@ class TranscriptionResponse(BaseModel):
     text: str
 
 
+class ExportPdfRequest(BaseModel):
+    to_email: str
+    recipient_name: str = "Learner"
+    messages: list[dict]  # [{role: "user"|"aria", text: "..."}]
+
+
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok", "llm": "groq" if os.getenv("GROQ_API_KEY") else "local fallback"}
@@ -451,3 +457,29 @@ def support(request: SupportRequest, company: dict = Depends(verify_api_key)) ->
         return SupportResponse(**result)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/support/export-pdf")
+async def export_pdf(request: ExportPdfRequest, company: dict = Depends(verify_api_key)):
+    """Generate a PDF transcript and email it to the user."""
+    import asyncio
+    from tools.pdf_generator import generate_conversation_pdf
+    from api.email_sender import send_pdf_email
+
+    loop = asyncio.get_event_loop()
+    pdf_bytes = await loop.run_in_executor(
+        None,
+        lambda: generate_conversation_pdf(request.messages, company.get("name", "AriaCall")),
+    )
+    sent = await loop.run_in_executor(
+        None,
+        lambda: send_pdf_email(
+            to_email=request.to_email,
+            recipient_name=request.recipient_name,
+            pdf_bytes=pdf_bytes,
+            filename="aria-transcript.pdf",
+        ),
+    )
+    if not sent:
+        raise HTTPException(status_code=503, detail="Email could not be sent — check Gmail credentials.")
+    return {"sent": True, "to": request.to_email}

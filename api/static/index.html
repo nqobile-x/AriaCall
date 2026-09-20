@@ -220,7 +220,11 @@
     <main class="app-shell">
       <header>
         <div class="brand"><img src="/static/aria-mark.svg" alt="" /><span>ARIA</span><small>01</small></div>
-        <div class="header-actions"><button id="new-chat" type="button">NEW CHAT</button><div id="status" class="status"><i></i>System available</div></div>
+        <div class="header-actions">
+          <button id="export-pdf-btn" type="button" title="Export conversation as PDF" style="background:transparent;border:1px solid #35363d;color:#9898a8;padding:6px 12px;border-radius:6px;font-size:11px;letter-spacing:.06em;cursor:pointer;transition:border-color .2s,color .2s;" onmouseover="this.style.borderColor='#ff6d4a';this.style.color='#ff6d4a'" onmouseout="this.style.borderColor='#35363d';this.style.color='#9898a8'">PDF</button>
+          <button id="new-chat" type="button">NEW CHAT</button>
+          <div id="status" class="status"><i></i>System available</div>
+        </div>
       </header>
 
       <section id="conversation" class="conversation" aria-live="polite">

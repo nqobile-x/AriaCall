@@ -126,7 +126,11 @@ function toggleCallPanelExpanded() {
 cpMinimize?.addEventListener('click', () => setCallPanelMinimized(!callPanel?.classList.contains('minimized')));
 cpExpand?.addEventListener('click', toggleCallPanelExpanded);
 
+// ── CONVERSATION HISTORY (for PDF export) ────────────────────────────────────
+const chatHistory = [];
+
 function addMessage(kind, text, sources = []) {
+  chatHistory.push({ role: kind === 'user' ? 'user' : 'aria', text });
   document.querySelector('.welcome')?.remove();
   showPromptPanes();
   const item = document.createElement('article');
@@ -164,6 +168,8 @@ function appendToStreamingMessage(item, token) {
 
 function finalizeStreamingMessage(item, sources = []) {
   item.querySelector('.typing-cursor')?.remove();
+  const ariaText = (item.querySelector('div')?.textContent || '').trim();
+  if (ariaText) chatHistory.push({ role: 'aria', text: ariaText });
   if (sources.length) {
     const src = document.createElement('p');
     src.className = 'sources';
@@ -299,6 +305,7 @@ document.querySelector('#new-chat').addEventListener('click', () => {
   conversationId = crypto.randomUUID();
   localStorage.setItem(conversationIdKey, conversationId);
   conversation.innerHTML = '';
+  chatHistory.length = 0;
   ticketBanner.hidden = true;
   promptPanes?.classList.remove('visible');
   textarea.focus();
@@ -501,3 +508,66 @@ mic.addEventListener('click', async () => {
     setBusy(false, error.name === 'NotAllowedError' ? 'Allow microphone access' : 'Microphone unavailable');
   }
 });
+
+// ── PDF EXPORT ────────────────────────────────────────────────────────────────
+function openExportModal() {
+  if (chatHistory.length === 0) {
+    alert('Nothing to export yet — start a conversation first.');
+    return;
+  }
+  const existing = document.getElementById('export-modal');
+  if (existing) { existing.style.display = 'flex'; return; }
+
+  const modal = document.createElement('div');
+  modal.id = 'export-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:999;background:rgba(7,8,12,.82);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:24px;';
+  modal.innerHTML = `
+    <div style="background:#13141a;border:1px solid #252738;border-radius:16px;padding:32px;width:100%;max-width:400px;">
+      <h3 style="margin:0 0 8px;font-size:17px;color:#eeeaf4;font-family:'DM Sans',sans-serif;">Export conversation</h3>
+      <p style="margin:0 0 20px;font-size:13px;color:#9898a8;line-height:1.6;">Aria will email you a PDF transcript of this conversation.</p>
+      <label style="display:block;font-size:11px;letter-spacing:.08em;color:#686872;margin-bottom:6px;">YOUR NAME</label>
+      <input id="export-name" type="text" placeholder="e.g. Nqobile" style="width:100%;box-sizing:border-box;background:#0f1018;border:1px solid #252738;border-radius:8px;padding:10px 12px;font-size:14px;color:#eeeaf4;margin-bottom:12px;outline:none;"/>
+      <label style="display:block;font-size:11px;letter-spacing:.08em;color:#686872;margin-bottom:6px;">YOUR EMAIL</label>
+      <input id="export-email" type="email" placeholder="you@example.com" style="width:100%;box-sizing:border-box;background:#0f1018;border:1px solid #252738;border-radius:8px;padding:10px 12px;font-size:14px;color:#eeeaf4;margin-bottom:20px;outline:none;"/>
+      <div style="display:flex;gap:10px;">
+        <button id="export-cancel" style="flex:1;padding:11px;background:transparent;border:1px solid #35363d;border-radius:8px;color:#9898a8;font-size:13px;cursor:pointer;">Cancel</button>
+        <button id="export-send" style="flex:2;padding:11px;background:#ff6d4a;border:none;border-radius:8px;color:#fff;font-size:13px;font-weight:600;cursor:pointer;">Send PDF →</button>
+      </div>
+      <p id="export-status" style="margin:12px 0 0;font-size:12px;text-align:center;color:#9898a8;min-height:18px;"></p>
+    </div>`;
+
+  document.body.appendChild(modal);
+
+  document.getElementById('export-cancel').addEventListener('click', () => modal.style.display = 'none');
+  modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+
+  document.getElementById('export-send').addEventListener('click', async () => {
+    const email = document.getElementById('export-email').value.trim();
+    const name = document.getElementById('export-name').value.trim() || 'Learner';
+    const status = document.getElementById('export-status');
+    if (!email || !email.includes('@')) { status.style.color = '#f87171'; status.textContent = 'Enter a valid email address.'; return; }
+
+    const btn = document.getElementById('export-send');
+    btn.disabled = true; btn.textContent = 'Sending…';
+    status.style.color = '#9898a8'; status.textContent = '';
+
+    try {
+      const resp = await fetch('/support/export-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-API-Key': 'aria-demo-key-2024' },
+        body: JSON.stringify({ to_email: email, recipient_name: name, messages: chatHistory }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to send');
+      }
+      status.style.color = '#6ee7b7'; status.textContent = `Sent! Check ${email}`;
+      btn.textContent = 'Sent ✓';
+    } catch (err) {
+      status.style.color = '#f87171'; status.textContent = err.message;
+      btn.disabled = false; btn.textContent = 'Send PDF →';
+    }
+  });
+}
+
+document.getElementById('export-pdf-btn')?.addEventListener('click', openExportModal);

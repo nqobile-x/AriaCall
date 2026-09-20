@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import logging
 import os
+from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -189,4 +190,72 @@ def send_ticket_email(to_email: str, customer_name: str, ticket_id: str, issue: 
         return True
     except Exception as exc:
         logger.error("Gmail API exception: %s", exc)
+    return False
+
+
+def send_pdf_email(to_email: str, recipient_name: str, pdf_bytes: bytes, filename: str = "aria-transcript.pdf") -> bool:
+    """Email a PDF transcript as an attachment via Gmail REST API."""
+    gmail_user = os.getenv("GMAIL_USER")
+    if not all([
+        os.getenv("GMAIL_CLIENT_ID"),
+        os.getenv("GMAIL_CLIENT_SECRET"),
+        os.getenv("GMAIL_REFRESH_TOKEN"),
+        gmail_user,
+    ]):
+        logger.warning("Gmail OAuth env vars not set — skipping PDF email")
+        return False
+    try:
+        access_token = _get_access_token()
+        if not access_token:
+            logger.error("Failed to obtain Gmail access token for PDF email")
+            return False
+
+        msg = MIMEMultipart()
+        msg["Subject"] = "Your Aria conversation transcript"
+        msg["From"] = f"Aria Support <{gmail_user}>"
+        msg["To"] = to_email
+
+        body_html = f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"/></head>
+<body style="margin:0;padding:0;background:#0f1114;font-family:'Helvetica Neue',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f1114;padding:40px 0;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#17181d;border-radius:8px;overflow:hidden;">
+        <tr><td style="background:#ff6d4a;padding:24px 32px;">
+          <span style="font-size:20px;font-weight:700;letter-spacing:.12em;color:#fff;">ARIA</span>
+          <span style="padding-left:8px;font-size:10px;color:rgba(255,255,255,.7);letter-spacing:.06em;">/ TRANSCRIPT</span>
+        </td></tr>
+        <tr><td style="padding:32px;">
+          <p style="margin:0 0 16px;font-size:15px;color:#f5f1ea;">Hi {recipient_name},</p>
+          <p style="margin:0 0 20px;font-size:14px;color:#9898a8;line-height:1.65;">
+            Your conversation with Aria is attached as a PDF. Keep it as a reference or share it with your trainer.
+          </p>
+          <p style="margin:0;font-size:13px;color:#686872;">— The Aria team</p>
+        </td></tr>
+        <tr><td style="padding:16px 32px;border-top:1px solid #35363d;">
+          <p style="margin:0;font-size:11px;color:#686872;">You received this because you exported your Aria conversation.</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+
+        msg.attach(MIMEText(body_html, "html"))
+
+        attachment = MIMEApplication(pdf_bytes, _subtype="pdf")
+        attachment.add_header("Content-Disposition", "attachment", filename=filename)
+        msg.attach(attachment)
+
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+        resp = httpx.post(
+            _SEND_URL,
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={"raw": raw},
+            timeout=20,
+        )
+        resp.raise_for_status()
+        logger.info("PDF transcript emailed to %s", to_email)
+        return True
+    except Exception as exc:
+        logger.error("Gmail PDF email exception: %s", exc)
     return False
