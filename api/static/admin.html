@@ -768,7 +768,10 @@
             <div class="canvas-input-wrap">
               <textarea class="canvas-textarea" id="canvas-input"
                 placeholder="Paste your error message or code question here…&#10;&#10;e.g. NullPointerException at UserService.java:42&#10;or: Why is my pandas merge returning NaN?"></textarea>
-              <button class="canvas-submit" id="canvas-submit">Ask Aria →</button>
+              <div style="display:flex;gap:8px;">
+                <button class="canvas-submit" id="canvas-submit" style="flex:1;">Ask Aria →</button>
+                <button id="canvas-run" title="Run Python code in sandbox" style="padding:10px 14px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);border-radius:8px;font-size:12px;cursor:pointer;white-space:nowrap;">▶ Run</button>
+              </div>
             </div>
             <div id="canvas-history"></div>
           </div>
@@ -804,6 +807,19 @@
         <div id="topics-list">
           <div class="empty"><div class="empty-icon">▦</div>No conversation data yet</div>
         </div>
+      </div>
+
+      <div class="panel" style="margin-top:16px;">
+        <div class="panel-head">
+          <h3>Response Cache</h3>
+          <span class="ph-sub">in-memory · 30-min TTL · reduces Groq API calls</span>
+        </div>
+        <div id="cache-stats" style="display:flex;gap:24px;padding:20px 0 4px;flex-wrap:wrap;">
+          <div><div style="font-size:11px;letter-spacing:.08em;color:var(--text3);margin-bottom:4px;">LIVE ENTRIES</div><div id="cache-live" style="font-size:28px;font-weight:700;color:var(--coral);">—</div></div>
+          <div><div style="font-size:11px;letter-spacing:.08em;color:var(--text3);margin-bottom:4px;">TOTAL STORED</div><div id="cache-total" style="font-size:28px;font-weight:700;color:var(--text);">—</div></div>
+          <div style="margin-left:auto;align-self:flex-end;"><button onclick="loadCacheStats()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text2);padding:7px 14px;border-radius:6px;font-size:12px;cursor:pointer;">Refresh</button></div>
+        </div>
+        <p style="font-size:12px;color:var(--text3);margin:0;">Repeated questions from learners hit the cache instead of Groq — faster responses, lower API usage at scale.</p>
       </div>
     </div>
 
@@ -853,7 +869,7 @@ function switchPage(name) {
   document.querySelectorAll('.nav-item').forEach(i => i.classList.toggle('active', i.dataset.page === name));
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
   if (name === 'tickets') loadTickets();
-  if (name === 'analytics') loadTopics();
+  if (name === 'analytics') { loadTopics(); loadCacheStats(); }
   if (name === 'knowledge') loadDocs();
   if (name === 'quality') renderQuality();
   if (name === 'data') initDataCleaner();
@@ -996,6 +1012,14 @@ async function loadTopics() {
   }, 50);
 }
 
+async function loadCacheStats() {
+  try {
+    const data = await api('/admin/cache');
+    document.getElementById('cache-live').textContent = data.live ?? '—';
+    document.getElementById('cache-total').textContent = data.entries ?? '—';
+  } catch { /* silently ignore */ }
+}
+
 // ── CODE CANVAS ───────────────────────────────────────────────────────────────
 let _canvasLang = 'java';
 let _canvasInit = false;
@@ -1016,6 +1040,7 @@ function initCodeCanvas() {
 
   // Submit
   document.getElementById('canvas-submit').addEventListener('click', canvasAsk);
+  document.getElementById('canvas-run').addEventListener('click', canvasRunCode);
   document.getElementById('canvas-input').addEventListener('keydown', e => {
     if (e.key === 'Enter' && e.ctrlKey) canvasAsk();
   });
@@ -1049,6 +1074,42 @@ function copyCode(id) {
   const el = document.getElementById(id);
   if (!el) return;
   navigator.clipboard.writeText(el.textContent).then(() => toast('Copied!', 'ok'));
+}
+
+async function canvasRunCode() {
+  const input = document.getElementById('canvas-input');
+  const code = input.value.trim();
+  if (!code) return;
+
+  if (_canvasLang !== 'python' && _canvasLang !== 'general') {
+    toast('▶ Run only works for Python code', 'err'); return;
+  }
+
+  const output = document.getElementById('canvas-output');
+  const statusEl = document.getElementById('canvas-status');
+  const runBtn = document.getElementById('canvas-run');
+  runBtn.disabled = true; runBtn.textContent = 'Running…';
+  statusEl.textContent = 'Executing…';
+  output.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:8px;">Running in sandbox…</div>';
+
+  try {
+    const resp = await fetch('/code/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': API_KEY },
+      body: JSON.stringify({ code, language: 'python' }),
+    });
+    const data = await resp.json();
+    const stdout = data.stdout ? `<div class="canvas-code-block"><span class="lang-label">OUTPUT</span><pre><code class="hljs">${data.stdout.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code></pre></div>` : '';
+    const stderr = data.stderr ? `<div class="canvas-code-block" style="border-color:#f87171;"><span class="lang-label" style="color:#f87171;">STDERR</span><pre><code class="hljs" style="color:#f87171;">${data.stderr.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code></pre></div>` : '';
+    const err = data.error ? `<p style="color:#f87171;font-size:13px;padding:8px 0;">${data.error.replace(/</g,'&lt;')}</p>` : '';
+    output.innerHTML = (stdout || stderr || err) || '<p style="color:var(--text3);font-size:13px;padding:8px 0;">No output.</p>';
+    statusEl.textContent = data.error ? 'Error' : 'Done';
+  } catch (err) {
+    output.innerHTML = `<p style="color:#f87171;font-size:13px;">${err.message}</p>`;
+    statusEl.textContent = 'Error';
+  } finally {
+    runBtn.disabled = false; runBtn.textContent = '▶ Run';
+  }
 }
 
 async function canvasAsk() {

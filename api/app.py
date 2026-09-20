@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from functools import lru_cache
@@ -8,6 +9,9 @@ logger = logging.getLogger(__name__)
 from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
+
+# ── PERFORMANCE: concurrency gate (max 10 simultaneous Groq calls) ────────────
+_GROQ_SEMAPHORE = asyncio.Semaphore(10)
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
@@ -400,23 +404,47 @@ async def data_clean(
 
 @app.post("/support/stream")
 async def support_stream(request: SupportRequest, company: dict = Depends(verify_api_key)) -> StreamingResponse:
-    import asyncio, json as _json
+    import json as _json
+    from tools.cache import get as cache_get, set as cache_set
 
     async def generate():
         loop = asyncio.get_event_loop()
         conv_id = request.conversation_id or str(uuid4())
+
+        # Check cache first (only for stateless one-off questions, not mid-conversation)
+        cached = None
+        if not request.conversation_id:
+            cached = cache_get(company["company_id"], request.message)
+
+        if cached:
+            logger.info("Cache HIT for company=%s", company["company_id"])
+            text = cached.get("response", "")
+            words = text.split(" ")
+            for i, word in enumerate(words):
+                chunk = word + (" " if i < len(words) - 1 else "")
+                yield f"data: {_json.dumps({'type': 'token', 'text': chunk})}\n\n"
+                await asyncio.sleep(0.025)
+            yield f"data: {_json.dumps({'type': 'done', 'conversation_id': conv_id, 'ticket': cached.get('ticket'), 'escalated': cached.get('escalated', False), 'faq_sources': cached.get('faq_sources', []), 'audit_logged': False, 'learning_suggestion': cached.get('learning_suggestion'), 'quality': None, 'cached': True})}\n\n"
+            return
+
         try:
-            result = await loop.run_in_executor(None, lambda: agent.handle(
-                message=request.message,
-                customer_id=request.customer_id,
-                conversation_id=conv_id,
-                company_id=company["company_id"],
-            ))
+            async with _GROQ_SEMAPHORE:
+                result = await loop.run_in_executor(None, lambda: agent.handle(
+                    message=request.message,
+                    customer_id=request.customer_id,
+                    conversation_id=conv_id,
+                    company_id=company["company_id"],
+                ))
         except Exception as exc:
             yield f"data: {_json.dumps({'type': 'error', 'detail': str(exc)})}\n\n"
             return
 
         text = result.get("response", "")
+
+        # Cache non-escalated, non-ticket responses for repeat questions
+        if not result.get("escalated") and not result.get("ticket") and not request.conversation_id:
+            cache_set(company["company_id"], request.message, result)
+
         words = text.split(" ")
         for i, word in enumerate(words):
             chunk = word + (" " if i < len(words) - 1 else "")
@@ -436,7 +464,7 @@ async def support_stream(request: SupportRequest, company: dict = Depends(verify
         except Exception as _qe:
             logger.warning("Jev scoring skipped: %s", _qe)
 
-        yield f"data: {_json.dumps({'type': 'done', 'conversation_id': conv_id, 'ticket': result.get('ticket'), 'escalated': result.get('escalated', False), 'faq_sources': result.get('faq_sources', []), 'audit_logged': result.get('audit_logged', False), 'learning_suggestion': result.get('learning_suggestion'), 'quality': quality})}\n\n"
+        yield f"data: {_json.dumps({'type': 'done', 'conversation_id': conv_id, 'ticket': result.get('ticket'), 'escalated': result.get('escalated', False), 'faq_sources': result.get('faq_sources', []), 'audit_logged': result.get('audit_logged', False), 'learning_suggestion': result.get('learning_suggestion'), 'quality': quality, 'cached': False})}\n\n"
 
     return StreamingResponse(
         generate(),
@@ -483,3 +511,25 @@ async def export_pdf(request: ExportPdfRequest, company: dict = Depends(verify_a
     if not sent:
         raise HTTPException(status_code=503, detail="Email could not be sent — check Gmail credentials.")
     return {"sent": True, "to": request.to_email}
+
+
+# ── PHASE 5: CODE EXECUTION (E2B sandbox / safe local fallback) ───────────────
+class CodeRunRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=10_000)
+    language: str = "python"  # only python supported for now
+
+
+@app.post("/code/run")
+async def run_code(request: CodeRunRequest, company: dict = Depends(verify_api_key)):
+    if request.language.lower() != "python":
+        raise HTTPException(status_code=400, detail="Only Python execution is supported.")
+    from tools.e2b_runner import run_python
+    result = await asyncio.get_event_loop().run_in_executor(None, lambda: run_python(request.code))
+    return result
+
+
+# ── PHASE 5: CACHE STATS ──────────────────────────────────────────────────────
+@app.get("/admin/cache")
+def cache_stats(company: dict = Depends(verify_api_key)) -> dict:
+    from tools.cache import stats
+    return stats()
