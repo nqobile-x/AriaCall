@@ -12,7 +12,7 @@ from pathlib import Path
 STATIC = Path(__file__).parent.parent / "api" / "static"
 HTML = (STATIC / "index.html").read_text(encoding="utf-8")
 CSS = (STATIC / "styles.css").read_text(encoding="utf-8")
-SCRIPTS = {name: (STATIC / name).read_text(encoding="utf-8") for name in ("app.js", "practice.js", "voice.js")}
+SCRIPTS = {name: (STATIC / name).read_text(encoding="utf-8") for name in ("app.js", "practice.js", "voice.js", "podcast.js")}
 
 
 def _lum(hex_colour):
@@ -55,12 +55,12 @@ class ScriptsMatchMarkup(unittest.TestCase):
             self.assertIn(cls, HTML, f".{cls} is queried by the scripts")
 
     def test_scripts_are_loaded_in_dependency_order(self):
-        order = [HTML.index(f"/static/{n}") for n in ("voice.js", "app.js", "practice.js")]
+        order = [HTML.index(f"/static/{n}") for n in ("voice.js", "app.js", "practice.js", "podcast.js")]
         self.assertEqual(order, sorted(order))
 
     def test_service_worker_precaches_every_script(self):
         sw = (STATIC / "sw.js").read_text(encoding="utf-8")
-        for name in ("app.js", "voice.js", "practice.js", "styles.css"):
+        for name in ("app.js", "voice.js", "practice.js", "podcast.js", "styles.css"):
             self.assertIn(f"/static/{name}", sw)
 
 
@@ -76,7 +76,7 @@ class MarkupBasics(unittest.TestCase):
     def test_tabs_are_an_accessible_tablist(self):
         self.assertIn('role="tablist"', HTML)
         tabs = re.findall(r'<button[^>]*role="tab"[^>]*>', HTML)
-        self.assertEqual(len(tabs), 4)
+        self.assertEqual(len(tabs), 5)
         self.assertTrue(all("aria-selected" in t for t in tabs))
         self.assertEqual(sum('aria-selected="true"' in t for t in tabs), 1)
 
@@ -188,6 +188,32 @@ class ReadableAndAccessible(unittest.TestCase):
         source = SCRIPTS["app.js"]
         self.assertIn("const h = escapeHtml(line)", source)
         self.assertIn("escapeHtml(body)", source)
+
+
+class PodcastIsWiredIn(unittest.TestCase):
+    def test_podcast_tab_panel_and_mode_switch_exist(self):
+        self.assertIn('data-mode="podcast"', HTML)
+        self.assertIn('id="panel-podcast"', HTML)
+        self.assertIn("['panel-podcast', 'podcast']", SCRIPTS["app.js"])
+
+    def test_model_text_only_enters_the_podcast_as_text(self):
+        source = SCRIPTS["podcast.js"]
+        for line in source.splitlines():
+            if "innerHTML" in line and not line.strip().startswith("//"):
+                self.assertRegex(line, r"innerHTML = (''|ep\.playing \? PAUSE_ICON : PLAY_ICON);", line.strip())
+        self.assertIn("text.textContent = line.text", source)
+        self.assertIn("asked.textContent", source)
+
+    def test_the_microphone_only_opens_while_the_episode_is_paused(self):
+        source = SCRIPTS["podcast.js"]
+        self.assertRegex(source, r"function openAsk\(\)[\s\S]*?pause\(\);")
+        self.assertRegex(source, r"function listen\(\)[\s\S]*?stopAudio\(\);[\s\S]*?rec\.start\(\)")
+
+    def test_chat_voice_and_podcast_never_overlap(self):
+        self.assertRegex(SCRIPTS["app.js"], r"async function speak\(text\) \{\s*window\.Podcast\?\.pause\(\)")
+
+    def test_podcast_inputs_do_not_trigger_ios_zoom(self):
+        self.assertRegex(CSS, r"#panel-podcast input\.field, #panel-podcast textarea\.field \{ font-size: 16px")
 
 
 class ListenAlongIsWiredIn(unittest.TestCase):

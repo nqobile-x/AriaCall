@@ -5,9 +5,9 @@
 // - The Python engine (Pyodide, from the CDN or /static/vendor): cache-first, it never changes.
 // - POST requests (chat, tutor, grading) are never cached or answered here.
 // - Media (/static/media) and any range request bypass the worker so the tour video streams normally.
-const VERSION = 'aria-v5';
+const VERSION = 'aria-v6';
 const SHELL = [
-  '/chat', '/static/styles.css', '/static/app.js', '/static/voice.js', '/static/practice.js', '/static/challenge_harness.py',
+  '/chat', '/static/styles.css', '/static/app.js', '/static/voice.js', '/static/practice.js', '/static/podcast.js', '/static/challenge_harness.py',
   '/static/aria-wave.svg', '/static/aria-mark.svg', '/static/aria-call.svg',
 ];
 const NETWORK_TIMEOUT_MS = 5000;

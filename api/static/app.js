@@ -309,6 +309,7 @@ async function callSupport(message, retries = 3) {
 }
 
 async function speak(text) {
+  window.Podcast?.pause();  // Aria's chat voice never talks over the podcast
   const withTimeout = (promise, ms) =>
     Promise.race([promise, new Promise(r => setTimeout(r, ms))]);
 
@@ -353,6 +354,7 @@ async function submit(message = textarea.value.trim()) {
       (result) => {
         finalData = result;
         finalizeStreamingMessage(ariaItem, result.faq_sources);
+        if (!result.escalated) window.Podcast?.offer(ariaItem, message);
         if (result.escalated && result.ticket) {
           ticketBanner.hidden = false;
           ticketBanner.innerHTML = `<strong>HUMAN SUPPORT REQUESTED</strong><br>Ticket ${result.ticket.id} is open.`;
@@ -690,7 +692,7 @@ function switchMode(mode) {
   chat.forEach(el => { if (el && el.id !== 'ticket-banner') el.style.display = isChat ? '' : 'none'; });
   const banner = document.getElementById('ticket-banner');
   if (banner) banner.style.display = isChat ? '' : 'none';
-  for (const [id, name] of [['panel-code', 'code'], ['panel-data', 'data'], ['panel-practice', 'practice']]) {
+  for (const [id, name] of [['panel-code', 'code'], ['panel-data', 'data'], ['panel-practice', 'practice'], ['panel-podcast', 'podcast']]) {
     const panel = document.getElementById(id);
     if (panel) panel.style.display = mode === name ? 'flex' : 'none';
   }

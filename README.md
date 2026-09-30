@@ -37,6 +37,7 @@ cleans messy spreadsheets and teaches code, all in one app.
 - **Ticketing.** Escalations become tickets your team sees in the admin dashboard.
 - **Data cleaner.** CSV, Excel and JSON profiling and cleanup, with a report of what changed.
 - **Code tutor and practice.** Explain, review and run code; graded challenges and mock interviews.
+- **Podcast mode (Aria Overviews).** Turn any topic, chat answer or your own notes/file into a two-host audio episode with Aria and Leo. Raise your hand mid-episode to ask a question: they answer it and carry on. Download the episode as an MP3, plus the transcript. US or South African voices.
 - **Export.** Save a conversation as a PDF.
 - **Works with a bad connection.** The app opens and Python practice keeps running offline once loaded.
 - **Private by default.** Personal details are redacted before anything is logged.
@@ -175,6 +176,11 @@ When no note answers a message, Aria writes a proposed note to `Knowledge Base/R
 | `POST` | `/support` | Submit a support message |
 | `POST` | `/voice` | Text → WAV (Kokoro TTS) |
 | `POST` | `/transcribe` | Audio file → text (Faster-Whisper) |
+| `POST` | `/podcast/script` | Stream a new two-host episode, one line per event (SSE) |
+| `POST` | `/podcast/ask` | The hosts answer a listener's question mid-episode |
+| `POST` | `/podcast/voice` | One episode line → audio in that host's voice |
+| `POST` | `/podcast/download` | Whole episode → one MP3 (WAV from the local voice when offline) |
+| `POST` | `/podcast/extract` | PDF, Word or text file → notes for an episode |
 | `GET` | `/docs` | OpenAPI docs |
 
 **POST /support**
@@ -235,7 +241,7 @@ Pass `customer_id` in the request, or include their email in the message — Ari
 $env:VIRTUAL_ENV="$PWD\venv"; venv\Scripts\python.exe -m unittest discover -s tests -p "test_*.py"
 ```
 
-The suite (250+ tests) covers grounded KB retrieval, customer lookup, escalation and tickets, the code tutor and practice challenges, the data cleaner, offline mode, load protection and the UI contract.
+The suite (280+ tests) covers grounded KB retrieval, customer lookup, escalation and tickets, the code tutor and practice challenges, the data cleaner, podcast mode, offline mode, load protection and the UI contract.
 
 ---
 

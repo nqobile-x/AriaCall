@@ -739,3 +739,129 @@ def challenge_solution(body: ChallengeSolutionRequest, request: Request, company
 def cache_stats(company: dict = Depends(verify_api_key)) -> dict:
     from tools.cache import stats
     return stats()
+
+
+# ── AUDIO OVERVIEWS (two-host podcast the listener can interrupt) ─────────────
+def _limiter_pair(per_minute: int) -> tuple[_RateLimiter, _RateLimiter]:
+    """(per browser, per network) limiters, like the tutor's."""
+    return _RateLimiter(limit=per_minute, window=60.0), _RateLimiter(limit=per_minute * IP_LIMIT_FACTOR, window=60.0)
+
+
+_podcast_limiter = _limiter_pair(6)            # new episodes
+_podcast_ask_limiter = _limiter_pair(20)       # listener questions
+_podcast_voice_limiter = _limiter_pair(240)    # voiced lines
+_podcast_download_limiter = _limiter_pair(4)
+PodcastSpeaker = Literal["aria", "leo"]
+PodcastAccent = Literal["us", "za"]
+
+
+class PodcastLine(BaseModel):
+    speaker: PodcastSpeaker
+    text: str = Field(min_length=1, max_length=600)
+
+
+class PodcastScriptRequest(BaseModel):
+    topic: str = Field(min_length=2, max_length=300)
+    notes: str = Field(default="", max_length=12_000)
+    length: Literal["short", "standard", "deep"] = "standard"
+
+
+class PodcastAskRequest(BaseModel):
+    topic: str = Field(min_length=2, max_length=300)
+    question: str = Field(min_length=2, max_length=500)
+    recent: list[PodcastLine] = Field(default_factory=list, max_length=12)
+    notes: str = Field(default="", max_length=12_000)
+
+
+class PodcastVoiceRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=600)
+    speaker: PodcastSpeaker = "aria"
+    accent: PodcastAccent = "us"
+
+
+class PodcastDownloadRequest(BaseModel):
+    title: str = Field(default="Aria Overview", max_length=120)
+    lines: list[PodcastLine] = Field(min_length=1, max_length=90)
+    accent: PodcastAccent = "us"
+
+
+def _podcast_allow(limiters: tuple[_RateLimiter, _RateLimiter], request: Request, company: dict, detail: str) -> None:
+    browser_key, ip_key = _client_keys(request, company)
+    if not (limiters[0].allow(browser_key) and limiters[1].allow(ip_key)):
+        raise HTTPException(status_code=429, detail=detail)
+
+
+@app.post("/podcast/script")
+def podcast_script(body: PodcastScriptRequest, request: Request, company: dict = Depends(verify_api_key)) -> StreamingResponse:
+    """Stream a new episode as it is written: a `sources` event, then one `line` event per spoken line."""
+    from tools.podcast import script_events
+
+    _podcast_allow(_podcast_limiter, request, company, "You've started a lot of episodes quickly. Please wait a minute and try again.")
+    logger.info("podcast script: length=%s topic_chars=%d notes_chars=%d", body.length, len(body.topic), len(body.notes))
+
+    def generate():
+        try:
+            for event in script_events(body.topic.strip(), body.notes, body.length, company["company_id"]):
+                yield f"data: {_json_dumps(event)}\n\n"
+        except Exception:
+            logger.exception("Podcast script failed unexpectedly")
+            yield f"data: {_json_dumps({'type': 'error', 'detail': 'Something went wrong writing the episode. Please try again.'})}\n\n"
+            return
+        yield f"data: {_json_dumps({'type': 'done'})}\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.post("/podcast/ask")
+async def podcast_ask(body: PodcastAskRequest, request: Request, company: dict = Depends(verify_api_key)) -> dict:
+    """The hosts answer a listener's question, then steer back to the episode."""
+    from tools.podcast import answer_lines
+
+    _podcast_allow(_podcast_ask_limiter, request, company, "Lots of questions at once! Please wait a moment and ask again.")
+    recent = [line.model_dump() for line in body.recent]
+    return await run_in_threadpool(answer_lines, body.topic.strip(), body.question.strip(), recent, body.notes, company["company_id"])
+
+
+@app.post("/podcast/voice", responses={200: {"content": {"audio/mpeg": {}, "audio/wav": {}}}})
+async def podcast_voice(body: PodcastVoiceRequest, request: Request, company: dict = Depends(verify_api_key)) -> Response:
+    from tools.podcast import synthesize
+
+    _podcast_allow(_podcast_voice_limiter, request, company, "Too many voice requests. Please wait a moment.")
+    try:
+        audio, media_type = await synthesize(body.text, body.speaker, body.accent)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="No podcast voice is available right now.") from exc
+    return Response(content=audio, media_type=media_type, headers={"Cache-Control": "private, max-age=3600"})
+
+
+@app.post("/podcast/download")
+async def podcast_download(body: PodcastDownloadRequest, request: Request, company: dict = Depends(verify_api_key)) -> Response:
+    """The whole episode as one audio file (MP3, or WAV from the local voice when offline)."""
+    from tools.podcast import build_episode
+
+    _podcast_allow(_podcast_download_limiter, request, company, "Please wait a minute before downloading again.")
+    try:
+        audio, media_type = await build_episode([line.model_dump() for line in body.lines], body.accent)
+    except Exception as exc:
+        logger.warning("Podcast download failed: %s", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="The episode couldn't be turned into audio right now. Try again in a moment.") from exc
+    slug = re.sub(r"[^a-z0-9]+", "-", body.title.lower()).strip("-")[:60] or "aria-overview"
+    extension = "mp3" if media_type == "audio/mpeg" else "wav"
+    return Response(content=audio, media_type=media_type, headers={"Content-Disposition": f'attachment; filename="{slug}.{extension}"'})
+
+
+@app.post("/podcast/extract")
+async def podcast_extract(file: UploadFile = File(...), company: dict = Depends(verify_api_key)) -> dict:
+    """Pull the text out of a PDF, Word or text file so it can be used as episode notes. Nothing is stored."""
+    ext = (file.filename or "").rsplit(".", 1)[-1].lower()
+    if ext not in {"pdf", "docx", "txt", "md"}:
+        raise HTTPException(status_code=415, detail="Use a PDF, Word (.docx), text or Markdown file.")
+    data = await file.read(10 * 1024 * 1024 + 1)
+    if len(data) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large — max 10MB.")
+    from tools.rag import parse_file
+    text = await run_in_threadpool(parse_file, data, f"file.{ext}")
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="Couldn't find any text in that file.")
+    return {"text": text[:12_000], "truncated": len(text) > 12_000}

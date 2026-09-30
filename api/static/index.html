@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Fonts load without blocking the page; system fonts show first and when offline. -->
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Instrument+Serif:ital@0;1&display=swap" />
-    <link rel="stylesheet" href="/static/styles.css?v=5" />
+    <link rel="stylesheet" href="/static/styles.css?v=6" />
   </head>
   <body>
     <!-- ONBOARDING WIZARD -->
@@ -96,6 +96,7 @@
           <button class="tab mode-tab" data-mode="code" role="tab" aria-selected="false" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/></svg><span>Code</span></button>
           <button class="tab mode-tab" data-mode="data" role="tab" aria-selected="false" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V11M12 20V4M19 20v-6M3 20h18"/></svg><span>Data</span></button>
           <button class="tab mode-tab" data-mode="practice" role="tab" aria-selected="false" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><path d="M12 12h.01"/></svg><span>Practice</span></button>
+          <button class="tab mode-tab" data-mode="podcast" role="tab" aria-selected="false" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4.5" height="7" rx="1.8"/><rect x="16.5" y="14" width="4.5" height="7" rx="1.8"/></svg><span>Podcast</span></button>
         </nav>
 
         <div class="topbar-actions">
@@ -206,10 +207,88 @@
         <button id="data-analyze-btn" class="btn btn-primary" type="button" disabled>Analyze with Aria →</button>
         <div id="data-output"></div>
       </div>
+
+      <!-- PODCAST (Aria Overviews) -->
+      <div id="panel-podcast" class="panel" role="tabpanel" aria-label="Podcast: audio overviews">
+        <section class="pod-setup card" aria-labelledby="pod-heading">
+          <span class="label">Aria Overviews</span>
+          <h2 id="pod-heading" class="pod-heading">Turn any topic into a two-host podcast</h2>
+          <p class="note">Aria and Leo talk it through from the knowledge base and your notes. Ask a question at any point and they'll answer, then carry on. Download the episode when you're done.</p>
+          <label class="form-label" for="pod-topic">Topic</label>
+          <input id="pod-topic" class="field" type="text" maxlength="300" autocomplete="off" placeholder="e.g. How PulseFlow billing works, or What is Spring Security?" />
+          <details class="pod-notes">
+            <summary>Add your own notes or a file (optional)</summary>
+            <label class="sr-only" for="pod-notes">Notes for the episode</label>
+            <textarea id="pod-notes" class="field" rows="5" maxlength="12000" placeholder="Paste notes, an article or meeting minutes. The hosts will talk about this."></textarea>
+            <div class="row">
+              <input id="pod-file" type="file" accept=".pdf,.docx,.txt,.md" class="sr-only" />
+              <label for="pod-file" class="btn btn-ghost btn-sm">Add a PDF, Word or text file</label>
+              <p id="pod-file-status" class="note" role="status" aria-live="polite"></p>
+            </div>
+          </details>
+          <div class="row pod-options">
+            <div id="pod-length" class="seg" role="group" aria-label="Episode length">
+              <button type="button" data-value="short" aria-pressed="false">Short · 2 min</button>
+              <button type="button" data-value="standard" class="is-active" aria-pressed="true">Standard · 5 min</button>
+              <button type="button" data-value="deep" aria-pressed="false">Deep dive · 9 min</button>
+            </div>
+            <div id="pod-accent" class="seg seg-good" role="group" aria-label="Host accent">
+              <button type="button" data-value="us" class="is-active" aria-pressed="true">US voices</button>
+              <button type="button" data-value="za" aria-pressed="false">South African voices</button>
+            </div>
+          </div>
+          <button id="pod-generate" class="btn btn-primary" type="button">Generate episode</button>
+        </section>
+
+        <section id="pod-player" class="pod-player card" aria-labelledby="pod-episode-title" hidden>
+          <div class="pod-head">
+            <div class="pod-avatars" aria-hidden="true"><span class="pod-avatar pod-aria">A</span><span class="pod-avatar pod-leo">L</span></div>
+            <div class="grow">
+              <h3 id="pod-episode-title" class="pod-episode-title"></h3>
+              <p id="pod-status" class="note" role="status" aria-live="polite"></p>
+            </div>
+          </div>
+          <p id="pod-sources" class="note"></p>
+          <p id="pod-notice" class="notice notice-warn" hidden></p>
+          <div class="pod-progress-row">
+            <div class="pod-progress" role="progressbar" aria-label="Episode progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="pod-progress-bar"></i></div>
+            <span id="pod-progress-text" class="pod-progress-text"></span>
+          </div>
+          <div class="pod-controls">
+            <button id="pod-prev" class="icon-btn pod-ctl" type="button" aria-label="Previous line" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M18 5.5 9 12l9 6.5z"/></svg></button>
+            <button id="pod-play" class="icon-btn pod-ctl pod-play" type="button" aria-label="Play episode" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg></button>
+            <button id="pod-next" class="icon-btn pod-ctl" type="button" aria-label="Next line" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14M6 5.5 15 12l-9 6.5z"/></svg></button>
+            <label class="pod-rate-wrap">Speed <select id="pod-rate" class="field" aria-label="Playback speed"><option value="0.85">0.85×</option><option value="1" selected>1×</option><option value="1.15">1.15×</option><option value="1.3">1.3×</option><option value="1.5">1.5×</option></select></label>
+            <button id="pod-ask-btn" class="btn btn-outline pod-ask-btn" type="button" disabled>✋ Ask a question</button>
+          </div>
+          <div id="pod-ask-box" class="pod-ask-box" hidden>
+            <label class="form-label" for="pod-question">Your question for Aria and Leo</label>
+            <div class="row">
+              <input id="pod-question" class="field grow" type="text" maxlength="500" autocomplete="off" placeholder="Type, or tap the mic and speak" />
+              <button id="pod-ask-mic" class="icon-btn mic" type="button" aria-label="Speak your question" aria-pressed="false"><span></span></button>
+            </div>
+            <div class="row">
+              <button id="pod-ask-send" class="btn btn-primary btn-sm" type="button">Ask</button>
+              <button id="pod-ask-cancel" class="btn btn-ghost btn-sm" type="button">Keep listening</button>
+            </div>
+            <p id="pod-ask-status" class="note" role="status" aria-live="polite"></p>
+          </div>
+          <ol id="pod-transcript" class="pod-transcript" aria-label="Transcript. Choose a line to play from there."></ol>
+          <div class="pod-downloads">
+            <label class="listen-check"><input type="checkbox" id="pod-include-qa" /> Include my questions and the answers</label>
+            <div class="row">
+              <button id="pod-download" class="btn btn-secondary btn-sm" type="button" disabled>Download audio</button>
+              <button id="pod-transcript-btn" class="btn btn-ghost btn-sm" type="button" disabled>Download transcript</button>
+            </div>
+            <p id="pod-download-status" class="note" role="status" aria-live="polite"></p>
+          </div>
+        </section>
+      </div>
     </main>
 
     <script src="/static/voice.js?v=5"></script>
-    <script src="/static/app.js?v=21"></script>
+    <script src="/static/app.js?v=22"></script>
     <script src="/static/practice.js?v=7"></script>
+    <script src="/static/podcast.js?v=3"></script>
   </body>
 </html>
