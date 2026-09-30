@@ -95,6 +95,7 @@
     $('pod-sources').textContent = '';
     $('pod-notice').hidden = true;
     setStatus('Aria and Leo are getting ready…');
+    setStage('ready');
     refreshControls();
     $('pod-player').scrollIntoView({ behavior: 'smooth', block: 'start' });
 
@@ -210,7 +211,7 @@
     const run = ep.runId;
     const line = ep.lines[ep.index];
     if (!line) {
-      if (ep.writing) { ep.waiting = true; setStatus('Aria is still writing the next part…'); } else finish();
+      if (ep.writing) { ep.waiting = true; setStatus('Aria is still writing the next part…'); setStage('ready'); } else finish();
       return;
     }
     highlight();
@@ -222,7 +223,7 @@
     if (url) {
       ep.audio.src = url;
       ep.audio.playbackRate = ep.rate;
-      try { await ep.audio.play(); } catch (_) { ep.playing = false; refreshControls(); setStatus('Tap play to listen.'); }
+      try { await ep.audio.play(); } catch (_) { ep.playing = false; refreshControls(); setStatus('Tap play to listen.'); setStage('paused'); }
     } else {
       // The server voice is unavailable: read the rest in the browser's own voices.
       if (!ep.useBrowserVoice) { ep.useBrowserVoice = true; showNotice("The podcast voices aren't reachable, so your browser's voices are reading this episode."); }
@@ -239,6 +240,7 @@
     if (pick) utter.voice = pick;
     utter.pitch = line.speaker === 'leo' ? 0.85 : 1.1;
     utter.rate = ep.rate;
+    utter.onstart = () => setStage('speaking', line.speaker);
     utter.onend = () => { if (run === ep.runId && ep.playing) advance(); };
     utter.onerror = utter.onend;
     synth.cancel();
@@ -246,6 +248,7 @@
   }
 
   const speaking = () => ep.playing && ep.audio.src && !ep.audio.src.startsWith('data:');
+  ep.audio.addEventListener('playing', () => { if (speaking()) setStage('speaking', ep.lines[ep.index]?.speaker); });
   ep.audio.addEventListener('ended', () => { if (speaking()) advance(); });
   ep.audio.addEventListener('error', () => { if (speaking()) advance(); });
 
@@ -283,6 +286,7 @@
     ep.audio.pause();
     if (ep.useBrowserVoice) window.speechSynthesis?.cancel();
     setStatus('Paused');
+    setStage('paused');
     refreshControls();
   }
 
@@ -303,6 +307,7 @@
     highlight();
     updateProgress();
     setStatus('Episode finished. Download it, or ask a question about it.');
+    setStage('done');
     refreshControls();
   }
 
@@ -317,6 +322,7 @@
     $('pod-question').value = '';
     $('pod-question').focus();
     setStatus('Paused for your question');
+    setStage('asking');
   }
 
   function closeAsk() {
@@ -335,6 +341,7 @@
     const askStatus = $('pod-ask-status');
     askStatus.dataset.kind = 'info';
     askStatus.textContent = 'Aria and Leo are thinking about your question…';
+    setStage('thinking');
     const here = Math.min(ep.index, ep.lines.length);
     const recent = ep.lines.slice(Math.max(0, here - 6), here + 1).map(l => ({ speaker: l.speaker, text: l.text }));
     try {
@@ -359,6 +366,7 @@
       refreshControls();
       askStatus.dataset.kind = 'warn';
       askStatus.textContent = err instanceof TypeError ? "Can't reach the Aria server." : err.message;
+      setStage('asking');
     }
   }
 
@@ -392,6 +400,7 @@
     btn.setAttribute('aria-pressed', 'true');
     askStatus.dataset.kind = 'info';
     askStatus.textContent = 'Listening… ask your question.';
+    setStage('listening');
     rec.onresult = e => {
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i += 1) {
@@ -409,6 +418,7 @@
       ep.recognition = null;
       btn.classList.remove('listening');
       btn.setAttribute('aria-pressed', 'false');
+      if (!ep.asking) setStage('asking');
       if (finalText.trim()) { $('pod-question').value = finalText.trim().slice(0, 500); submitQuestion(); }
     };
     ep.recognition = rec;
@@ -484,6 +494,34 @@
 
   // ── display ─────────────────────────────────────────────────────────────────
   function setStatus(text) { const el = $('pod-status'); if (el) el.textContent = text; }
+
+  // The call panel's wave, shown while the hosts talk. It is placed inline (not as an <img>) so its
+  // animation can freeze when the episode pauses, and the host who is talking lights up.
+  const STAGE_TEXT = {
+    ready: 'Aria and Leo are getting ready…',
+    paused: 'Paused',
+    asking: 'Waiting for your question',
+    listening: 'Listening to you…',
+    thinking: 'Aria and Leo are thinking…',
+    done: 'Episode finished',
+  };
+  function setStage(state, speaker) {
+    const stage = $('pod-stage');
+    const player = $('pod-player');
+    if (!stage) return;
+    stage.dataset.state = state;
+    player.dataset.state = state;
+    if (speaker) { stage.dataset.speaker = speaker; player.dataset.speaker = speaker; }
+    $('pod-speaker').textContent = state === 'speaking' ? `${NAMES[speaker] || 'Aria'} is speaking…` : STAGE_TEXT[state] || '';
+  }
+
+  fetch('/static/aria-call.svg')
+    .then(r => (r.ok ? r.text() : null))
+    .then(text => {
+      const svg = text && new DOMParser().parseFromString(text, 'image/svg+xml').documentElement;
+      if (svg && svg.nodeName.toLowerCase() === 'svg') $('pod-wave')?.replaceChildren(document.importNode(svg, true));
+    })
+    .catch(() => { /* the <img> fallback still shows the wave */ });
 
   function showNotice(text) {
     const el = $('pod-notice');

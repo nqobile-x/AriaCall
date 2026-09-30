@@ -209,6 +209,15 @@ class PodcastIsWiredIn(unittest.TestCase):
         self.assertRegex(source, r"function openAsk\(\)[\s\S]*?pause\(\);")
         self.assertRegex(source, r"function listen\(\)[\s\S]*?stopAudio\(\);[\s\S]*?rec\.start\(\)")
 
+    def test_hosts_are_shown_speaking_with_the_call_wave(self):
+        source = SCRIPTS["podcast.js"]
+        self.assertIn('id="pod-wave"', HTML)
+        self.assertIn("aria-call.svg", HTML)
+        self.assertIn("is speaking…", source)
+        self.assertIn("setStage('speaking', line.speaker)", source)
+        self.assertRegex(CSS, r'\.pod-stage:not\(\[data-state="speaking"\]\) \.pod-wave svg \* \{ animation-play-state: paused')
+        self.assertNotRegex(source, r"pod-wave[^\n]*innerHTML")
+
     def test_chat_voice_and_podcast_never_overlap(self):
         self.assertRegex(SCRIPTS["app.js"], r"async function speak\(text\) \{\s*window\.Podcast\?\.pause\(\)")
 

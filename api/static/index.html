@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Fonts load without blocking the page; system fonts show first and when offline. -->
     <link rel="stylesheet" media="print" onload="this.media='all'" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Instrument+Serif:ital@0;1&display=swap" />
-    <link rel="stylesheet" href="/static/styles.css?v=6" />
+    <link rel="stylesheet" href="/static/styles.css?v=8" />
   </head>
   <body>
     <!-- ONBOARDING WIZARD -->
@@ -248,6 +248,10 @@
               <p id="pod-status" class="note" role="status" aria-live="polite"></p>
             </div>
           </div>
+          <div id="pod-stage" class="pod-stage" data-state="ready">
+            <div id="pod-wave" class="pod-wave" aria-hidden="true"><img src="/static/aria-call.svg" alt="" /></div>
+            <p id="pod-speaker" class="pod-speaker">Aria and Leo are getting ready…</p>
+          </div>
           <p id="pod-sources" class="note"></p>
           <p id="pod-notice" class="notice notice-warn" hidden></p>
           <div class="pod-progress-row">
@@ -289,6 +293,6 @@
     <script src="/static/voice.js?v=5"></script>
     <script src="/static/app.js?v=22"></script>
     <script src="/static/practice.js?v=7"></script>
-    <script src="/static/podcast.js?v=3"></script>
+    <script src="/static/podcast.js?v=4"></script>
   </body>
 </html>

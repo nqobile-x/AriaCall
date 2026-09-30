@@ -828,6 +828,23 @@ select.field { padding-right: 8px; }
 .pod-avatar.pod-aria { background: var(--accent); color: var(--accent-ink); }
 .pod-avatar.pod-leo { margin-left: -10px; background: var(--good); color: #0d1a14; }
 .pod-episode-title { margin: 0 0 2px; font: 600 17px/1.3 var(--font-ui); overflow-wrap: anywhere; }
+.pod-stage { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 6px 0 2px; }
+.pod-wave { display: flex; align-items: center; justify-content: center; width: 248px; max-width: 100%; height: 104px; overflow: hidden; transition: opacity .35s var(--ease), filter .35s var(--ease); }
+.pod-wave svg, .pod-wave img { display: block; width: 248px; max-width: 100%; height: 104px; }
+.pod-stage:not([data-state="speaking"]) .pod-wave { opacity: .35; filter: saturate(.4); }
+.pod-stage:not([data-state="speaking"]) .pod-wave svg * { animation-play-state: paused !important; }  /* the bars set their animation inline */
+.pod-stage[data-state="thinking"] .pod-wave, .pod-stage[data-state="listening"] .pod-wave { opacity: .6; animation: podBreathe 1.6s ease-in-out infinite; }
+@keyframes podBreathe { 50% { opacity: .9; } }
+.pod-speaker { min-height: 16px; margin: 0; font: 500 12px/1 var(--font-mono); letter-spacing: .08em; color: var(--text-2); text-transform: uppercase; text-align: center; }
+.pod-stage[data-state="speaking"][data-speaker="aria"] .pod-speaker { color: var(--accent); }
+.pod-stage[data-state="speaking"][data-speaker="leo"] .pod-speaker { color: var(--good); }
+.pod-stage[data-state="listening"] .pod-speaker { color: var(--accent); }
+.pod-avatars .pod-avatar { position: relative; transition: transform .25s var(--spring), box-shadow .25s var(--ease), opacity .25s; }
+.pod-player[data-state="speaking"] .pod-avatar { opacity: .45; }
+.pod-player[data-state="speaking"][data-speaker="aria"] .pod-avatar.pod-aria,
+.pod-player[data-state="speaking"][data-speaker="leo"] .pod-avatar.pod-leo { opacity: 1; transform: scale(1.12); z-index: 1; }
+.pod-player[data-state="speaking"][data-speaker="aria"] .pod-avatar.pod-aria { box-shadow: 0 0 0 3px #ff6d4a55, 0 0 18px #ff6d4a66; }
+.pod-player[data-state="speaking"][data-speaker="leo"] .pod-avatar.pod-leo { box-shadow: 0 0 0 3px #7ee8b855, 0 0 18px #7ee8b866; }
 .pod-progress-row { display: flex; align-items: center; gap: 10px; }
 .pod-progress { flex: 1; height: 6px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
 .pod-progress i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--good)); transition: width .4s var(--ease); }
